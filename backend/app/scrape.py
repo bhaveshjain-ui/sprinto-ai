@@ -7,7 +7,6 @@ from urllib.parse import urlparse
 from urllib.robotparser import RobotFileParser
 
 import httpx
-import trafilatura
 
 from app import cache
 
@@ -96,6 +95,8 @@ def fetch(conn: sqlite3.Connection, url: str) -> Page | None:
     if not res["ok"]:
         return None
     html = res["html"]
+    import trafilatura  # lazy: heavy, only needed where research runs
+
     text = trafilatura.extract(html, favor_recall=True) or ""
     return Page(
         url=url,

@@ -5,8 +5,6 @@ import sqlite3
 import time
 from datetime import date
 
-from google import genai
-from google.genai import types
 
 from app import cache, scrape
 from app.config import PROMPTS, env
@@ -44,6 +42,8 @@ def parse_json(text: str):
 
 def _call(model: str, prompt: str, grounded: bool, min_interval: float = 1.0):
     global _client, _last_call
+    from google import genai  # imported lazily: only needed where research runs
+    from google.genai import types
     wait = min_interval - (time.time() - _last_call)
     if wait > 0:
         time.sleep(wait)

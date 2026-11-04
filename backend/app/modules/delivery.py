@@ -83,7 +83,7 @@ def send(conn, draft_id: int, sender=_resend_send) -> dict:
                            (draft_id, to, d["subject"], d["body"]))  # unique index blocks a second live send
         send_id = cur.lastrowid
         conn.commit()
-    except sqlite3.IntegrityError:
+    except db.IntegrityErrors:
         conn.rollback()
         raise DeliveryError("a send for this draft is already in progress or done")
     except Exception:

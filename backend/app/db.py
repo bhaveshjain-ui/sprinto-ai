@@ -1,4 +1,6 @@
 import json
+import os
+import re
 import sqlite3
 from pathlib import Path
 
@@ -89,12 +91,143 @@ CREATE UNIQUE INDEX IF NOT EXISTS one_live_send ON sends(draft_id) WHERE status 
 
 _INITIALISED: set[str] = set()
 
+NOW_PG = "to_char(now() at time zone 'utc', 'YYYY-MM-DD HH24:MI:SS')"
+ID_TABLES = {"companies", "facts", "research_log", "decisions", "contacts", "drafts", "sends", "icp_reports"}
 
-def connect(path: str | Path | None = None) -> sqlite3.Connection:
+try:  # Postgres (Neon) is optional: SQLite remains the local default
+    import psycopg
+
+    IntegrityErrors: tuple = (sqlite3.IntegrityError, psycopg.errors.IntegrityError)
+except ImportError:  # pragma: no cover
+    psycopg = None
+    IntegrityErrors = (sqlite3.IntegrityError,)
+
+
+def pg_schema() -> str:
+    return (SCHEMA.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "BIGSERIAL PRIMARY KEY")
+            .replace("DEFAULT (datetime('now'))", f"DEFAULT ({NOW_PG})")
+            .replace(" REAL", " DOUBLE PRECISION"))
+
+
+def translate(sql: str, has_params: bool) -> tuple[str, bool]:
+    """Rewrite this app's SQLite-flavoured SQL for Postgres. Returns (sql, wants_returning_id)."""
+    s = sql.strip().rstrip(";")
+    if s.upper() == "BEGIN IMMEDIATE":
+        return "BEGIN", False
+    s = re.sub(r"datetime\('now',\s*\?\)", f"to_char((now() at time zone 'utc') + ?::interval, 'YYYY-MM-DD HH24:MI:SS')", s)
+    s = s.replace("datetime('now')", NOW_PG)
+    mode = None
+    m = re.match(r"INSERT OR (IGNORE|REPLACE) INTO", s, re.I)
+    if m:
+        mode = m.group(1).upper()
+        s = "INSERT INTO" + s[m.end():]
+    if has_params:
+        s = s.replace("%", "%%")
+    s = s.replace("?", "%s")
+    is_insert = s.upper().startswith("INSERT")
+    table = (re.match(r"INSERT INTO\s+(\w+)", s, re.I) or [None, ""])[1].lower() if is_insert else ""
+    if mode == "IGNORE":
+        s += " ON CONFLICT DO NOTHING"
+    elif mode == "REPLACE":
+        if table == "cache":
+            s += " ON CONFLICT (namespace, key) DO UPDATE SET value=EXCLUDED.value, created_at=EXCLUDED.created_at"
+        elif table == "settings":
+            s += " ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value"
+    ret = is_insert and table in ID_TABLES and "RETURNING" not in s.upper()
+    if ret:
+        s += " RETURNING id"
+    return s, ret
+
+
+class Row(dict):
+    """Row that supports row["name"], row[0] and dict(row), like sqlite3.Row."""
+
+    def __getitem__(self, k):
+        return list(self.values())[k] if isinstance(k, int) else super().__getitem__(k)
+
+
+def _row_factory(cursor):
+    names = [c.name for c in cursor.description or []]
+    return lambda values: Row(zip(names, values))
+
+
+class PgCursor:
+    def __init__(self, cur, returning: bool):
+        self._cur = cur
+        self.lastrowid = None
+        if returning:
+            row = cur.fetchone() if cur.description else None
+            self.lastrowid = row["id"] if row else None
+
+    @property
+    def rowcount(self):
+        return self._cur.rowcount
+
+    def fetchone(self):
+        return self._cur.fetchone() if self._cur.description else None
+
+    def fetchall(self):
+        return self._cur.fetchall() if self._cur.description else []
+
+    def __iter__(self):
+        return iter(self.fetchall())
+
+
+class PgConn:
+    """sqlite3-style connection over psycopg (autocommit; explicit transactions via BEGIN IMMEDIATE)."""
+
+    def __init__(self, url: str):
+        self.raw = psycopg.connect(url, autocommit=True, prepare_threshold=None, row_factory=_row_factory)
+
+    def execute(self, sql: str, params=()):
+        s, ret = translate(sql, bool(params))
+        cur = self.raw.cursor()
+        cur.execute(s, list(params) if params else None)
+        if s == "BEGIN":
+            cur.execute("LOCK TABLE sends IN SHARE ROW EXCLUSIVE MODE")
+        return PgCursor(cur, ret)
+
+    def _in_txn(self) -> bool:
+        return self.raw.info.transaction_status != psycopg.pq.TransactionStatus.IDLE
+
+    def commit(self):
+        if self._in_txn():
+            self.raw.execute("COMMIT")
+
+    def rollback(self):
+        if self._in_txn():
+            self.raw.execute("ROLLBACK")
+
+    def close(self):
+        try:
+            self.raw.close()
+        except Exception:
+            pass
+
+    def __del__(self):
+        self.close()
+
+
+def _pg_url() -> str | None:
+    return os.environ.get("DATABASE_URL", "").strip() or None
+
+
+def connect(path: str | Path | None = None):
     if path is None:
         from app.config import load_config
 
-        path = ROOT / load_config()["db_path"]
+        cfg = load_config()
+        url = _pg_url()
+        if url:
+            conn = PgConn(url)
+            if "pg" not in _INITIALISED and not os.environ.get("VERCEL"):
+                try:
+                    conn.raw.execute(pg_schema())
+                except Exception:
+                    pass  # another process created the tables first
+                _INITIALISED.add("pg")
+            return conn
+        path = ROOT / cfg["db_path"]
     conn = sqlite3.connect(path, timeout=60)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA busy_timeout=60000")

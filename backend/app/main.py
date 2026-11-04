@@ -29,6 +29,9 @@ def rows(c, sql, *a):
 
 def start_job(name: str, fn):
     """Run fn(conn, progress) in a thread; one job of each name at a time."""
+    if os.environ.get("VERCEL"):
+        raise HTTPException(501, "Research jobs run on your own machine (serverless functions time out). "
+                                 "Run the app locally against the same database, then review and send here.")
     if JOBS.get(name, {}).get("running"):
         raise HTTPException(409, f"{name} already running")
     JOBS[name] = {"running": True, "message": "starting", "error": None, "cancel": False}

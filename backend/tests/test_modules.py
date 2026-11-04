@@ -276,3 +276,16 @@ def test_research_stops_when_verified(c, monkeypatch):
 def test_prompt_loader_accepts_name_variable():
     from app import llm
     assert "Acme" in llm.load_prompt("research_facts", name="Acme", domain="acme.com", criteria="saas")
+
+
+def test_postgres_translation():
+    t, ret = db.translate("INSERT OR IGNORE INTO companies (domain, name) VALUES (?,?)", True)
+    assert t.endswith("ON CONFLICT DO NOTHING RETURNING id") and "%s" in t and ret
+    t, _ = db.translate("INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)", True)
+    assert "ON CONFLICT (key) DO UPDATE" in t
+    t, _ = db.translate("UPDATE drafts SET updated_at=datetime('now') WHERE id=?", True)
+    assert "datetime" not in t and "to_char(now()" in t
+    assert db.translate("BEGIN IMMEDIATE", False)[0] == "BEGIN"
+    t, _ = db.translate("SELECT 1 FROM cache WHERE created_at >= datetime('now', ?)", True)
+    assert "%s::interval" in t
+    assert "BIGSERIAL" in db.pg_schema() and "AUTOINCREMENT" not in db.pg_schema()

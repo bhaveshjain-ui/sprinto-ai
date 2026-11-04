@@ -1,0 +1,5 @@
+-r requirements.txt
+google-genai>=1.0
+trafilatura>=1.12
+uvicorn>=0.29
+pytest>=8.0

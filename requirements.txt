@@ -1,9 +1,7 @@
-google-genai>=1.0
-httpx>=0.27
-trafilatura>=1.12
+# Slim set used by the Vercel function (review, approve, send). Research needs requirements-local.txt too.
 fastapi>=0.110
-uvicorn>=0.29
+httpx>=0.27
 resend>=2.0
 pyyaml>=6.0
 python-dotenv>=1.0
-pytest>=8.0
+psycopg[binary]>=3.1
