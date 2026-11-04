@@ -1,0 +1,65 @@
+model: gemini-3.8-flash
+db_path: sprinto.db
+gemini_min_interval_s: 1.0
+cache_ttl_days: 7          # cached Gemini/page responses older than this are refetched
+refresh_days: 14           # companies researched longer ago than this get re-researched
+
+discover:
+  candidates: 40
+  focuses:
+    - "recent funding announcements (Series A, B or C) in the last 12 months"
+    - "announced enterprise customer wins or expansion into enterprise / international markets in the last 12 months"
+    - "preparing for or announcing SOC 2 / ISO 27001 compliance, or hiring for security/compliance roles"
+
+shortlist:
+  keep_max: 50             # only a safety cap; companies are ranked and verified, not arbitrarily cut
+  allowed_stages: ["Series A", "Series B", "Series C"]
+
+# Months a source page's date may be old, per criterion. null = no date needed.
+recency_months:
+  funding_stage: 18
+  audit_signals: 6
+  customers: 12
+  employee_count: 12
+  saas: null
+  industry: null
+  cloud: null
+  competitor: 12
+
+research:
+  max_attempts: 4
+  scrape_paths: ["", "/about", "/about-us", "/company", "/careers", "/jobs", "/security", "/trust", "/trust-center"]
+  ats_hosts: ["greenhouse.io", "lever.co", "ashbyhq.com", "workable.com", "bamboohr.com"]
+  max_ats_pages: 2
+  max_chars_per_page: 8000
+  min_snippet_chars: 15
+
+scoring:
+  weights:
+    funding_stage: 15
+    saas: 15
+    audit_signals: 25
+    employee_count: 10
+    customers: 15
+    industry: 10
+    cloud: 10
+  qualified_min: 75
+  investigate_min: 55
+  proceed_min: 55          # companies at/above this (qualified or further investigation) continue to contact + draft
+  employee_full: [20, 500]
+  employee_half: [[10, 19], [501, 1000]]
+  enterprise_keywords: ["enterprise", "fortune", "global 2000", "large customers"]
+  relevant_industries: ["fintech", "health", "security", "data", "ai", "devops", "developer", "hr", "payments", "insurance", "legal", "analytics", "saas", "software", "cloud", "infrastructure"]
+
+intent:
+  high_min_signals: 3
+  medium_min_signals: 2
+
+contacts:
+  min_confidence: 70       # Hunter confidence; the email verifier must still return "valid"
+
+drafting:
+  max_words: 120
+  max_subject_words: 7
+  max_retries: 2
+  allowed_terms: ["Sprinto", "SOC", "ISO", "HIPAA", "GDPR", "SaaS", "GRC", "PCI", "DSS"]
