@@ -328,13 +328,14 @@ function Settings() {
   const [s, load] = useData('/settings')
   const [tests, setTests] = useState({})
   const test = async (n) => { setTests((t) => ({ ...t, [n]: '...' })); const r = await api('/selftest/' + n, { method: 'POST' }); setTests((t) => ({ ...t, [n]: (r.ok ? 'OK' : 'FAILED') + (r.detail ? ' - ' + (typeof r.detail === 'string' ? r.detail : JSON.stringify(r.detail)) : '') })) }
-  const on = s ? Object.values(s.integrations).filter(Boolean).length : 0
+  const relevant = s ? Object.entries(s.integrations).filter(([k]) => !(s.cloud && s.local_only?.includes(k))) : []
+  const on = relevant.filter(([, v]) => v).length
   return <>
     <Card title="Integrations (keys live in the backend .env, never in the browser)" accent="from-sky-400 to-indigo-500"
-      right={s && <Gauge value={(on / Math.max(Object.keys(s.integrations).length, 1)) * 100} size={60} />}>
+      right={s && <Gauge value={(on / Math.max(relevant.length, 1)) * 100} size={60} />}>
       <table className="w-full text-sm"><tbody>{s && Object.entries(s.integrations).map(([k, v]) => <tr key={k} className="border-t border-slate-100">
-        <td className="py-2 font-mono">{k}</td><td><Badge v={v ? 'VERIFIED' : 'NOT_FOUND'} /> {v ? 'configured' : 'missing'}</td>
-        <td>{['GEMINI_API_KEY:gemini', 'HUNTER_API_KEY:hunter', 'RESEND_API_KEY:resend'].filter((x) => x.startsWith(k)).map((x) => {
+        <td className="py-2 font-mono">{k}</td><td>{s.cloud && s.local_only?.includes(k) ? <><Badge v="shortlisted" /> <span className="text-slate-500 text-sm">runs locally, not needed here</span></> : <><Badge v={v ? 'VERIFIED' : 'NOT_FOUND'} /> {v ? 'configured' : 'missing'}</>}</td>
+        <td>{(s.cloud && s.local_only?.includes(k) ? [] : ['GEMINI_API_KEY:gemini', 'HUNTER_API_KEY:hunter', 'RESEND_API_KEY:resend']).filter((x) => x.startsWith(k)).map((x) => {
           const n = x.split(':')[1]; return <span key={n}><Btn onClick={() => test(n)}>Test</Btn> <span className="text-xs">{tests[n]}</span></span> })}</td></tr>)}</tbody></table>
     </Card>
   </>

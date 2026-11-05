@@ -87,6 +87,8 @@ def settings():
         "dry_run": db.get_setting(c, "dry_run", "false") == "true",
         "integrations": {k: has_env(k) for k in ("GEMINI_API_KEY", "HUNTER_API_KEY",
                                                  "RESEND_API_KEY", "SENDER_EMAIL", "MY_EMAIL")},
+        "cloud": bool(os.environ.get("VERCEL")),
+        "local_only": ["GEMINI_API_KEY", "HUNTER_API_KEY"],
         "recipient": os.environ.get("MY_EMAIL", ""),
         "recipient_hint": "All emails go to MY_EMAIL only.",
     }
@@ -107,6 +109,8 @@ def selftest(name: str):
     """Cheap live check of each integration."""
     from app.config import env
 
+    if os.environ.get("VERCEL") and name in ("gemini", "hunter"):
+        return {"ok": True, "detail": "runs on your own machine, not needed on Vercel"}
     try:
         if name == "gemini":
             from app import llm
