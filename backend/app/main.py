@@ -20,7 +20,7 @@ JOBS: dict[str, dict] = {}
 
 
 def conn():
-    return db.connect()
+    return db.connect_cached()
 
 
 def rows(c, sql, *a):
@@ -37,7 +37,7 @@ def start_job(name: str, fn):
     JOBS[name] = {"running": True, "message": "starting", "error": None, "cancel": False}
 
     def run():
-        c = conn()
+        c = db.connect()
         try:
             fn(c, lambda m: JOBS[name].update(message=m))
         except Exception as e:
@@ -67,19 +67,17 @@ def jobs():
 @app.get("/api/overview")
 def overview():
     c = conn()
-    n = lambda sql, *a: c.execute(sql, a).fetchone()[0]
-    return {
-        "discovered": n("SELECT COUNT(*) FROM companies"),
-        "researched": n("SELECT COUNT(*) FROM companies WHERE researched_at IS NOT NULL"),
-        "filtered_out": n("SELECT COUNT(*) FROM companies WHERE status='stopped' AND stage IN ('discover','shortlist')"),
-        "in_queue": n("SELECT COUNT(*) FROM companies WHERE status IN ('shortlisted','researched') AND classification IS NULL"),
-        "qualified": n("SELECT COUNT(*) FROM companies WHERE classification='qualified'"),
-        "further_investigation": n("SELECT COUNT(*) FROM companies WHERE classification='further_investigation'"),
-        "rejected": n("SELECT COUNT(*) FROM companies WHERE classification='rejected'"),
-        "high_priority": n("SELECT COUNT(*) FROM companies WHERE priority='High' AND status IN ('lead','drafted')"),
-        "pending_approvals": n("SELECT COUNT(*) FROM drafts WHERE status IN ('pending','approved')"),
-        "sent": n("SELECT COUNT(*) FROM sends WHERE status='sent'"),
-    }
+    return dict(c.execute("""SELECT
+      (SELECT COUNT(*) FROM companies) AS discovered,
+      (SELECT COUNT(*) FROM companies WHERE researched_at IS NOT NULL) AS researched,
+      (SELECT COUNT(*) FROM companies WHERE status='stopped' AND stage IN ('discover','shortlist')) AS filtered_out,
+      (SELECT COUNT(*) FROM companies WHERE status IN ('shortlisted','researched') AND classification IS NULL) AS in_queue,
+      (SELECT COUNT(*) FROM companies WHERE classification='qualified') AS qualified,
+      (SELECT COUNT(*) FROM companies WHERE classification='further_investigation') AS further_investigation,
+      (SELECT COUNT(*) FROM companies WHERE classification='rejected') AS rejected,
+      (SELECT COUNT(*) FROM companies WHERE priority='High' AND status IN ('lead','drafted')) AS high_priority,
+      (SELECT COUNT(*) FROM drafts WHERE status IN ('pending','approved')) AS pending_approvals,
+      (SELECT COUNT(*) FROM sends WHERE status='sent') AS sent""").fetchone())
 
 
 @app.get("/api/settings")
@@ -180,7 +178,7 @@ def process_all():
             cid, name = item
             if JOBS["process"].get("cancel"):
                 return
-            wc = conn()
+            wc = db.connect()
             try:
                 for attempt in range(4):  # a lock clash is transient and the work is cached, so retrying is cheap
                     try:
@@ -247,23 +245,32 @@ def leads():
 
 
 # --- review & delivery -------------------------------------------------------
+def _in(ids) -> str:
+    return ",".join(str(int(i)) for i in ids) or "NULL"
+
+
 @app.get("/api/drafts")
 def drafts(status: str | None = None):
+    """Few round trips on purpose: batch-load companies, contacts, facts and sends for all drafts."""
     c = conn()
-    out = []
     q = "SELECT * FROM drafts" + (" WHERE status=?" if status else "") + " ORDER BY id DESC"
-    for d in rows(c, q, *([status] if status else [])):
-        co = dict(c.execute("SELECT * FROM companies WHERE id=?", (d["company_id"],)).fetchone())
+    ds = rows(c, q, *([status] if status else []))
+    if not ds:
+        return []
+    cos = {r["id"]: r for r in rows(c, f"SELECT * FROM companies WHERE id IN ({_in({d['company_id'] for d in ds})})")}
+    cts = {r["id"]: r for r in rows(c, f"SELECT * FROM contacts WHERE id IN ({_in({d['contact_id'] for d in ds})})")}
+    fact_ids = {i for d in ds for i in json.loads(d["fact_ids"])}
+    facts = {r["id"]: r for r in rows(c, f"SELECT id, criterion, value, source_url, snippet, page_date FROM facts WHERE id IN ({_in(fact_ids)})")}
+    sends = rows(c, f"SELECT draft_id, status, resend_id, error, created_at FROM sends WHERE draft_id IN ({_in(d['id'] for d in ds)}) ORDER BY id")
+    for d in ds:
+        co = cos[d["company_id"]]
         d["company"] = {k: co[k] for k in ("id", "name", "domain", "score", "classification", "priority")}
         d["score_detail"] = json.loads(co["score_detail"] or "{}")
         d["intent"] = json.loads(co["intent"] or "{}")
-        d["contact"] = dict(c.execute("SELECT * FROM contacts WHERE id=?", (d["contact_id"],)).fetchone())
-        ids = json.loads(d["fact_ids"])
-        d["sources"] = rows(c, f"SELECT id, criterion, value, source_url, snippet, page_date FROM facts "
-                               f"WHERE id IN ({','.join(map(str, ids)) or 'NULL'})")
-        d["sends"] = rows(c, "SELECT status, resend_id, error, created_at FROM sends WHERE draft_id=? ORDER BY id", d["id"])
-        out.append(d)
-    return out
+        d["contact"] = cts[d["contact_id"]]
+        d["sources"] = [facts[i] for i in json.loads(d["fact_ids"]) if i in facts]
+        d["sends"] = [{k: x[k] for k in ("status", "resend_id", "error", "created_at")} for x in sends if x["draft_id"] == d["id"]]
+    return ds
 
 
 class Edit(BaseModel):

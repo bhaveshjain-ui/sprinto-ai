@@ -2,6 +2,7 @@ import json
 import os
 import re
 import sqlite3
+import threading
 from pathlib import Path
 
 from app.config import ROOT
@@ -177,12 +178,24 @@ class PgConn:
     """sqlite3-style connection over psycopg (autocommit; explicit transactions via BEGIN IMMEDIATE)."""
 
     def __init__(self, url: str):
-        self.raw = psycopg.connect(url, autocommit=True, prepare_threshold=None, row_factory=_row_factory)
+        self.url = url
+        self._open()
+
+    def _open(self):
+        self.raw = psycopg.connect(self.url, autocommit=True, prepare_threshold=None, row_factory=_row_factory,
+                                   connect_timeout=20)
 
     def execute(self, sql: str, params=()):
         s, ret = translate(sql, bool(params))
-        cur = self.raw.cursor()
-        cur.execute(s, list(params) if params else None)
+        try:
+            cur = self.raw.cursor()
+            cur.execute(s, list(params) if params else None)
+        except psycopg.OperationalError:  # Neon closes idle connections; reconnect once (outside transactions only)
+            if s == "BEGIN" or self._in_txn():
+                raise
+            self._open()
+            cur = self.raw.cursor()
+            cur.execute(s, list(params) if params else None)
         if s == "BEGIN":
             cur.execute("LOCK TABLE sends IN SHARE ROW EXCLUSIVE MODE")
         return PgCursor(cur, ret)
@@ -206,6 +219,19 @@ class PgConn:
 
     def __del__(self):
         self.close()
+
+
+_local = threading.local()
+
+
+def connect_cached():
+    """One reusable connection per thread for the API (avoids a TLS handshake per request on Postgres)."""
+    if not _pg_url():
+        return connect()
+    c = getattr(_local, "conn", None)
+    if c is None:
+        c = _local.conn = connect()
+    return c
 
 
 def _pg_url() -> str | None:
