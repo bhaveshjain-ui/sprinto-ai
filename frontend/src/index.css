@@ -1,113 +1,98 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
-/* Two-colour system: OLIVE green (surfaces, text, neutrals) + LIGHT green (accent). */
+/* Reference theme: near-black sidebar, gold accent, cream surfaces, soft white cards. */
 @theme {
-  --color-slate-50: #12140d;
-  --color-slate-100: #181b11;
-  --color-slate-200: #2f3623;
-  --color-slate-300: #3f4830;
-  --color-slate-400: #6f7858;
-  --color-slate-500: #97a07f;
-  --color-slate-600: #b3bb9b;
-  --color-slate-700: #cbd3b4;
-  --color-slate-800: #e1e8cd;
-  --color-slate-900: #f1f5e3;
-  --color-slate-950: #f9fbf0;
-  --color-violet-50: #1a1e13;
-  --color-violet-100: #20251a;
-  --color-violet-200: #343b27;
-  --color-violet-300: #465033;
-  --color-violet-400: #8a9570;
-  --color-violet-500: #5d6b3c;
-  --color-violet-600: #6b7a45;
-  --color-violet-700: #bfc9a4;
-  --color-violet-800: #d3dcb9;
-  --color-violet-900: #e6edd2;
-  --color-violet-950: #f3f7e6;
-  --color-fuchsia-50: #1a1e13;
-  --color-fuchsia-100: #20251a;
-  --color-fuchsia-200: #343b27;
-  --color-fuchsia-300: #465033;
-  --color-fuchsia-400: #8a9570;
-  --color-fuchsia-500: #707e4a;
-  --color-fuchsia-600: #5a6639;
-  --color-fuchsia-700: #bfc9a4;
-  --color-fuchsia-800: #d3dcb9;
-  --color-fuchsia-900: #e6edd2;
-  --color-fuchsia-950: #f3f7e6;
-  --color-indigo-50: #1a1e13;
-  --color-indigo-100: #20251a;
-  --color-indigo-200: #343b27;
-  --color-indigo-300: #465033;
-  --color-indigo-400: #8a9570;
-  --color-indigo-500: #46512d;
-  --color-indigo-600: #4f5b33;
-  --color-indigo-700: #bfc9a4;
-  --color-indigo-800: #d3dcb9;
-  --color-indigo-900: #e6edd2;
-  --color-indigo-950: #f3f7e6;
-  --color-purple-50: #1a1e13;
-  --color-purple-100: #20251a;
-  --color-purple-200: #343b27;
-  --color-purple-300: #465033;
-  --color-purple-400: #8a9570;
-  --color-purple-500: #76854d;
-  --color-purple-600: #78845b;
-  --color-purple-700: #bfc9a4;
-  --color-purple-800: #d3dcb9;
-  --color-purple-900: #e6edd2;
-  --color-purple-950: #f3f7e6;
-  --color-blue-50: #1a1e13;
-  --color-blue-100: #20251a;
-  --color-blue-200: #343b27;
-  --color-blue-300: #465033;
-  --color-blue-400: #8a9570;
-  --color-blue-500: #7f8e55;
-  --color-blue-600: #78845b;
-  --color-blue-700: #bfc9a4;
-  --color-blue-800: #d3dcb9;
-  --color-blue-900: #e6edd2;
-  --color-blue-950: #f3f7e6;
-  --color-sky-50: #1a1e13;
-  --color-sky-100: #20251a;
-  --color-sky-200: #343b27;
-  --color-sky-300: #465033;
-  --color-sky-400: #8a9570;
-  --color-sky-500: #78884f;
-  --color-sky-600: #78845b;
-  --color-sky-700: #bfc9a4;
-  --color-sky-800: #d3dcb9;
-  --color-sky-900: #e6edd2;
-  --color-sky-950: #f3f7e6;
-  --color-cyan-50: #1a1e13;
-  --color-cyan-100: #20251a;
-  --color-cyan-200: #343b27;
-  --color-cyan-300: #465033;
-  --color-cyan-400: #8a9a60;
-  --color-cyan-500: #67704f;
-  --color-cyan-600: #78845b;
-  --color-cyan-700: #bfc9a4;
-  --color-cyan-800: #d3dcb9;
-  --color-cyan-900: #e6edd2;
-  --color-cyan-950: #f3f7e6;
-  --color-emerald-50: #1c2614; --color-emerald-100: #223019; --color-emerald-300: #4a6a30; --color-emerald-400: #b6e68a;
-  --color-emerald-500: #8fcf5a; --color-emerald-600: #76b845; --color-emerald-900: #e6f5d0;
-  --color-teal-400: #b6e68a; --color-teal-500: #8fcf5a;
-  --color-amber-50: #262a1b; --color-amber-100: #2d3220; --color-amber-300: #cdd5ad; --color-amber-400: #b8c18f;
-  --color-amber-500: #98a373; --color-amber-600: #858f63; --color-amber-950: #12140d;
-  --color-orange-400: #7f8a5a; --color-orange-500: #6d7850;
-  --color-rose-50: #232819; --color-rose-300: #5a6540; --color-rose-400: #5a6540; --color-rose-500: #4e5838; --color-rose-600: #d3dcb9;
-  --color-pink-500: #434d2f;
+  --font-sans: Poppins, ui-sans-serif, system-ui, sans-serif;
+  --color-violet-50: #faf6ee;
+  --color-violet-100: #f4ecdd;
+  --color-violet-200: #e8d9bc;
+  --color-violet-300: #dcc597;
+  --color-violet-400: #d1b07a;
+  --color-violet-500: #c59d5f;
+  --color-violet-600: #b38848;
+  --color-violet-700: #8f6a33;
+  --color-violet-800: #6e5127;
+  --color-violet-900: #4d391b;
+  --color-violet-950: #2e2210;
+  --color-fuchsia-50: #faf6ee;
+  --color-fuchsia-100: #f4ecdd;
+  --color-fuchsia-200: #e8d9bc;
+  --color-fuchsia-300: #dcc597;
+  --color-fuchsia-400: #d1b07a;
+  --color-fuchsia-500: #c59d5f;
+  --color-fuchsia-600: #b38848;
+  --color-fuchsia-700: #8f6a33;
+  --color-fuchsia-800: #6e5127;
+  --color-fuchsia-900: #4d391b;
+  --color-fuchsia-950: #2e2210;
+  --color-indigo-50: #faf6ee;
+  --color-indigo-100: #f4ecdd;
+  --color-indigo-200: #e8d9bc;
+  --color-indigo-300: #dcc597;
+  --color-indigo-400: #d1b07a;
+  --color-indigo-500: #c59d5f;
+  --color-indigo-600: #b38848;
+  --color-indigo-700: #8f6a33;
+  --color-indigo-800: #6e5127;
+  --color-indigo-900: #4d391b;
+  --color-indigo-950: #2e2210;
+  --color-purple-50: #faf6ee;
+  --color-purple-100: #f4ecdd;
+  --color-purple-200: #e8d9bc;
+  --color-purple-300: #dcc597;
+  --color-purple-400: #d1b07a;
+  --color-purple-500: #c59d5f;
+  --color-purple-600: #b38848;
+  --color-purple-700: #8f6a33;
+  --color-purple-800: #6e5127;
+  --color-purple-900: #4d391b;
+  --color-purple-950: #2e2210;
+  --color-blue-50: #faf6ee;
+  --color-blue-100: #f4ecdd;
+  --color-blue-200: #e8d9bc;
+  --color-blue-300: #dcc597;
+  --color-blue-400: #d1b07a;
+  --color-blue-500: #c59d5f;
+  --color-blue-600: #b38848;
+  --color-blue-700: #8f6a33;
+  --color-blue-800: #6e5127;
+  --color-blue-900: #4d391b;
+  --color-blue-950: #2e2210;
+  --color-sky-50: #faf6ee;
+  --color-sky-100: #f4ecdd;
+  --color-sky-200: #e8d9bc;
+  --color-sky-300: #dcc597;
+  --color-sky-400: #d1b07a;
+  --color-sky-500: #c59d5f;
+  --color-sky-600: #b38848;
+  --color-sky-700: #8f6a33;
+  --color-sky-800: #6e5127;
+  --color-sky-900: #4d391b;
+  --color-sky-950: #2e2210;
+  --color-cyan-50: #faf6ee;
+  --color-cyan-100: #f4ecdd;
+  --color-cyan-200: #e8d9bc;
+  --color-cyan-300: #dcc597;
+  --color-cyan-400: #d1b07a;
+  --color-cyan-500: #c59d5f;
+  --color-cyan-600: #b38848;
+  --color-cyan-700: #8f6a33;
+  --color-cyan-800: #6e5127;
+  --color-cyan-900: #4d391b;
+  --color-cyan-950: #2e2210;
+  --color-emerald-50: #f1f6e6; --color-emerald-100: #e3edcc; --color-emerald-300: #b6d27c; --color-emerald-400: #8cb83e;
+  --color-emerald-500: #6a9a22; --color-emerald-600: #587f1a; --color-emerald-900: #2f4510;
+  --color-teal-400: #8cb83e; --color-teal-500: #6a9a22;
+  --color-amber-50: #fdf6df; --color-amber-100: #faedc0; --color-amber-300: #f0cf6e; --color-amber-400: #e4b432;
+  --color-amber-500: #d9a21f; --color-amber-600: #b8850f; --color-amber-950: #2a1f05;
+  --color-orange-400: #e8934a; --color-orange-500: #d97a2e;
+  --color-rose-50: #fbebe6; --color-rose-300: #ef9a84; --color-rose-400: #e0663f; --color-rose-500: #d04a2a; --color-rose-600: #b23a1e;
+  --color-pink-500: #d9603f;
 }
 
-html { color-scheme: dark; }
-body { background: #12140d; color: #e6edd2; font-family: Inter, ui-sans-serif, system-ui, "Segoe UI", sans-serif; }
-.bg-white { background-color: #20251a; }
-/* light-green fills carry dark text */
-.bg-emerald-500, .from-emerald-500, .bg-emerald-400 { color: #12140d; }
-input, textarea, select { background-color: #181b11; color: #e6edd2; }
-input::placeholder, textarea::placeholder { color: #67704f; }
+html { color-scheme: light; }
+body { background: #c59d5f; color: #1b1b1d; font-family: Poppins, ui-sans-serif, system-ui, sans-serif; }
+input, textarea, select { background-color: #ffffff; color: #1b1b1d; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: #343b27; border-radius: 6px; }
-::-webkit-scrollbar-track { background: #12140d; }
-pre { color: #d3dcb9; }
+::-webkit-scrollbar-thumb { background: #dccfb4; border-radius: 6px; }

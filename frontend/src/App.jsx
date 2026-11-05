@@ -20,8 +20,8 @@ function useData(path, deps = []) {
 }
 
 /* ---------- palette ---------- */
-const C = { violet: '#8a9570', fuchsia: '#b8c18f', emerald: '#8fcf5a', amber: '#b8c18f', rose: '#5a6540',
-  sky: '#7f8a5a', slate: '#3f4830', indigo: '#cdd5ad' }
+const C = { violet: '#c59d5f', fuchsia: '#8f6a33', emerald: '#6a9a22', amber: '#e4b432', rose: '#d04a2a',
+  sky: '#5b8de0', slate: '#cfc7b8', indigo: '#19191b' }
 
 /* ---------- charts (plain SVG, no deps) ---------- */
 function Donut({ data, size = 170, center, sub }) {
@@ -30,7 +30,7 @@ function Donut({ data, size = 170, center, sub }) {
   let offset = 0
   return <div className="flex items-center gap-5 flex-wrap">
     <svg width={size} height={size} viewBox="0 0 140 140">
-      <circle cx="70" cy="70" r={r} fill="none" stroke="#343b27" strokeWidth="20" />
+      <circle cx="70" cy="70" r={r} fill="none" stroke="#efe7d9" strokeWidth="20" />
       {total > 0 && data.map((d) => {
         const len = (d.value / total) * circ
         const el = <circle key={d.label} cx="70" cy="70" r={r} fill="none" stroke={d.color} strokeWidth="20"
@@ -51,7 +51,7 @@ function Gauge({ value = 0, size = 96 }) {
   const color = value >= 75 ? C.emerald : value >= 55 ? C.amber : C.rose
   const r = 38, circ = 2 * Math.PI * r, len = (Math.min(value, 100) / 100) * circ
   return <svg width={size} height={size} viewBox="0 0 100 100">
-    <circle cx="50" cy="50" r={r} fill="none" stroke="#343b27" strokeWidth="12" />
+    <circle cx="50" cy="50" r={r} fill="none" stroke="#efe7d9" strokeWidth="12" />
     <circle cx="50" cy="50" r={r} fill="none" stroke={color} strokeWidth="12" strokeLinecap="round"
       strokeDasharray={`${len} ${circ - len}`} transform="rotate(-90 50 50)" />
     <text x="50" y="58" textAnchor="middle" style={{ fontSize: 26, fontWeight: 800 }} fill={color}>{Math.round(value)}</text>
@@ -67,12 +67,11 @@ function HBars({ rows }) {
 }
 
 /* ---------- primitives ---------- */
-const Card = ({ title, children, right, accent = 'from-violet-500 to-fuchsia-500' }) => (
-  <section className="bg-white rounded-2xl shadow-md shadow-indigo-100 mb-6 overflow-hidden">
-    <div className={'h-1.5 bg-gradient-to-r ' + accent} />
+const Card = ({ title, children, right }) => (
+  <section className="bg-white rounded-2xl border border-[#f0e9dc] shadow-[0_6px_24px_rgba(90,60,10,0.06)] mb-6">
     <div className="p-5">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-bold text-lg text-slate-800">{title}</h2>{right}
+        <h2 className="font-semibold text-lg text-[#19191b]">{title}</h2>{right}
       </div>
       {children}
     </div>
@@ -80,10 +79,10 @@ const Card = ({ title, children, right, accent = 'from-violet-500 to-fuchsia-500
 )
 const Btn = ({ children, kind = 'default', ...p }) => (
   <button {...p} className={'px-4 py-2 rounded-xl text-sm font-semibold transition disabled:opacity-50 ' + ({
-    default: 'bg-white border-2 border-slate-200 text-slate-700 hover:border-violet-400 hover:text-violet-700',
-    primary: 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-md shadow-fuchsia-200 hover:brightness-110',
-    success: 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-200 hover:brightness-110',
-    danger: 'bg-white border-2 border-rose-300 text-rose-600 hover:bg-rose-50',
+    default: 'bg-white border border-[#e4dccb] text-[#19191b] hover:border-[#c59d5f] hover:text-[#8f6a33] shadow-sm',
+    primary: 'bg-[#c59d5f] text-white shadow-md shadow-[#c59d5f]/30 hover:bg-[#b38848]',
+    success: 'bg-[#6a9a22] text-white shadow-md shadow-[#6a9a22]/25 hover:bg-[#587f1a]',
+    danger: 'bg-white border border-[#e8b4a6] text-[#b23a1e] hover:bg-[#fbebe6]',
   }[kind])}>{children}</button>
 )
 const BADGE = { VERIFIED: 'bg-emerald-500 text-white', qualified: 'bg-emerald-500 text-white', High: 'bg-emerald-500 text-white',
@@ -133,30 +132,31 @@ function Overview() {
     ['High priority', d.high_priority, C.fuchsia], ['Pending approval', d.pending_approvals, C.indigo], ['Sent', d.sent, C.amber]]
   const top = d ? Math.max(d.discovered, 1) : 1
   return <>
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">{tiles?.map(([k, v, g]) => (
-      <div key={k} className={'rounded-2xl p-4 text-white shadow-lg bg-gradient-to-br ' + g}>
-        <div className="text-4xl font-extrabold">{v}</div><div className="text-sm opacity-90 font-medium">{k}</div></div>))}</div>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">{tiles?.map(([k, v], i) => (
+      <div key={k} className="bg-white rounded-2xl border border-[#f0e9dc] shadow-[0_6px_24px_rgba(90,60,10,0.06)] p-4 flex items-center gap-3">
+        <div className="w-11 h-11 rounded-xl bg-[#f6efe4] text-[#b38848] flex items-center justify-center text-lg font-bold shrink-0">{['◈', '⌕', '★', '◎', '✕', '▲', '✉', '➤'][i]}</div>
+        <div><div className="text-2xl font-bold text-[#19191b] leading-none">{v}</div><div className="text-xs text-slate-500 mt-1">{k}</div></div></div>))}</div>
     {d && <div className="grid lg:grid-cols-2 gap-6">
       <Card title="Outcome split" accent="from-emerald-400 to-teal-500"><Donut center={d.discovered} sub="companies" data={[
         { label: 'Qualified', value: d.qualified, color: C.emerald }, { label: 'Further investigation', value: d.further_investigation, color: C.amber },
         { label: 'Rejected', value: d.rejected, color: C.rose }, { label: 'Being researched / queued', value: d.in_queue, color: C.sky }, { label: 'Filtered at shortlist', value: d.filtered_out, color: C.slate }]} /></Card>
       <Card title="Pipeline funnel" accent="from-sky-400 to-indigo-500"><HBars rows={funnel.map(([label, v, color]) => ({ label, right: v, pct: (v / top) * 100, color }))} /></Card>
     </div>}
-    <Card title="Run the pipeline" accent="from-fuchsia-500 to-rose-500">
-      <div className="flex flex-wrap gap-3 mb-4">
-        <Btn kind="primary" onClick={() => run(() => api('/autonomous', { method: 'POST' }))}>Autonomous discovery + full run</Btn>
-        <Btn onClick={() => run(() => api('/discover', { method: 'POST' }))}>Discover &amp; shortlist only</Btn>
-        <Btn onClick={() => run(() => api('/companies/process', { method: 'POST' }))}>Process shortlisted</Btn>
+    <section className="rounded-2xl bg-[#c59d5f] text-white p-6 mb-6 shadow-[0_8px_26px_rgba(197,157,95,0.35)]">
+      <h2 className="text-2xl font-semibold">Welcome back, Bhavesh!</h2>
+      <p className="text-sm text-white/85 mt-1">{d ? `${d.pending_approvals} drafts are waiting for your review.` : ' '} Run the pipeline or add company domains below.</p>
+      <div className="flex flex-wrap gap-3 mt-4 mb-4">
+        <button className="px-4 py-2 rounded-xl bg-white text-[#19191b] text-sm font-semibold shadow-sm hover:shadow-md" onClick={() => run(() => api('/autonomous', { method: 'POST' }))}>Autonomous discovery + full run</button>
+        <button className="px-4 py-2 rounded-xl bg-white text-[#19191b] text-sm font-semibold shadow-sm hover:shadow-md" onClick={() => run(() => api('/discover', { method: 'POST' }))}>Discover &amp; shortlist only</button>
+        <button className="px-4 py-2 rounded-xl bg-white text-[#19191b] text-sm font-semibold shadow-sm hover:shadow-md" onClick={() => run(() => api('/companies/process', { method: 'POST' }))}>Process shortlisted</button>
       </div>
-      <label className="text-sm text-slate-600 font-medium">Or enter company domains (one per line or comma-separated)</label>
-      <textarea className="w-full border-2 border-slate-200 focus:border-violet-400 outline-none rounded-xl p-3 mt-1 text-sm" rows="3" value={domains}
-        onChange={(e) => setDomains(e.target.value)} placeholder="acme.com, example.io" />
-      <div className="mt-3"><Btn onClick={() => run(async () => {
+      <textarea className="w-full rounded-xl p-3 text-sm text-[#19191b] placeholder-slate-400 outline-none" rows="2" value={domains}
+        onChange={(e) => setDomains(e.target.value)} placeholder="Company domains, one per line or comma-separated: acme.com, example.io" />
+      <div className="mt-3 flex items-center gap-3"><button className="px-4 py-2 rounded-xl bg-[#19191b] text-white text-sm font-semibold" onClick={() => run(async () => {
         const r = await api('/companies/manual', { method: 'POST', body: { domains: domains.split(/[\s,]+/).filter(Boolean) } })
         setMsg(`Added ${r.added.length}` + (r.invalid.length ? `; invalid: ${r.invalid.join(', ')}` : '') + '. Click "Process shortlisted".'); setDomains('')
-      })}>Add domains</Btn></div>
-      {msg && <p className="text-sm text-violet-700 font-medium mt-3">{msg}</p>}
-    </Card>
+      })}>Add domains</button>{msg && <span className="text-sm text-white font-medium">{msg}</span>}</div>
+    </section>
   </>
 }
 
@@ -343,38 +343,60 @@ function Settings() {
 const TABS = { 'Company Research': Research, 'Qualified Leads': Leads, Overview, 'ICP Discovery': Icp, 'Review Centre': Review, 'Sent Emails': Sent, Settings }
 const ICONS = { Overview: '◈', 'ICP Discovery': '◎', 'Company Research': '⌕', 'Qualified Leads': '★', 'Review Centre': '✉', 'Sent Emails': '➤', Settings: '⚙' }
 
+function ActivityPanel({ setTab }) {
+  const [drafts] = useData('/drafts?status=pending')
+  const [sent] = useData('/sent')
+  const [companies] = useData('/companies')
+  const Section = ({ title, to, children }) => <div className="mb-7">
+    <div className="flex items-center justify-between mb-3"><h3 className="font-semibold text-sm text-[#19191b]">{title}</h3>
+      <button onClick={() => setTab(to)} className="text-xs text-[#b38848] hover:underline">View all</button></div>
+    <div className="space-y-2.5">{children}</div></div>
+  const Item = ({ top, sub, badge }) => <div className="bg-white rounded-xl shadow-sm px-3.5 py-2.5 flex items-center gap-3">
+    <div className="min-w-0 flex-1"><div className="text-sm font-medium text-[#19191b] truncate">{top}</div><div className="text-[11px] text-slate-500 truncate">{sub}</div></div>{badge}</div>
+  const top = (companies || []).filter((c) => c.score != null).slice(0, 3)
+  return <aside className="hidden xl:block w-80 shrink-0 bg-[#f7f1e8] p-6 overflow-y-auto">
+    <h2 className="text-2xl font-bold text-[#19191b] mb-6">My activity</h2>
+    <Section title="Awaiting review" to="Review Centre">{(drafts || []).slice(0, 3).map((d) => <Item key={d.id} top={d.company.name}
+      sub={`${d.contact.first_name} ${d.contact.last_name} - ${d.contact.position}`} badge={<Badge v={d.company.priority} />} />)}
+      {drafts && drafts.length === 0 && <div className="text-xs text-slate-500">Nothing waiting.</div>}</Section>
+    <Section title="Top scored companies" to="Company Research">{top.map((c) => <Item key={c.id} top={c.name} sub={c.domain}
+      badge={<span className="text-sm font-bold text-[#8f6a33]">{c.score}</span>} />)}</Section>
+    <Section title="Latest sent" to="Sent Emails">{(sent || []).slice(0, 3).map((x) => <Item key={x.id} top={x.company} sub={x.subject} badge={<Badge v={x.status} />} />)}
+      {sent && sent.length === 0 && <div className="text-xs text-slate-500">No emails sent yet.</div>}</Section>
+  </aside>
+}
+
 export default function App() {
   const [tab, setTab] = useState('Overview')
   const [ov] = useData('/overview')
   const Page = TABS[tab]
   const today = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-  return <div className="flex flex-row-reverse min-h-screen bg-[#12140d]">
-    <nav className="w-64 shrink-0 bg-[#0d0f09] text-[#b3bb9b] flex flex-col border-l border-[#2a3020]">
-      <div className="px-5 py-6 border-b border-[#2a3020]">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#b6e68a] to-[#8fcf5a] flex items-center justify-center text-[#0d0f09] font-extrabold text-lg">S</div>
-          <div><div className="text-[#f1f5e3] font-bold leading-tight">Sprinto AI</div><div className="text-xs text-[#78845b]">Outbound intelligence</div></div>
+  return <div className="min-h-screen bg-[#c59d5f] p-3 md:p-10">
+    <div className="bg-[#19191b] rounded-[32px] p-3 md:p-4 flex gap-3 md:gap-4 min-h-[calc(100vh-5rem)] shadow-2xl shadow-black/30">
+      <nav className="w-60 shrink-0 flex flex-col text-[#a1a1a8] px-2 py-3">
+        <div className="flex items-center gap-2.5 px-3 pb-8 pt-2">
+          <div className="w-9 h-9 rounded-xl bg-[#c59d5f] flex items-center justify-center text-white font-extrabold">S</div>
+          <div className="text-white text-2xl font-extrabold tracking-tight">Sprinto<span className="text-[#c59d5f]">AI</span></div>
         </div>
+        <div className="flex-1">{Object.keys(TABS).map((t) => <button key={t} onClick={() => setTab(t)}
+          className={'flex items-center gap-3 w-full text-left px-4 py-3 rounded-xl text-sm font-medium mb-2 transition ' + (t === tab
+            ? 'bg-[#c59d5f] text-white shadow-md shadow-black/20' : 'hover:bg-white/5 hover:text-white')}>
+          <span className="text-base w-5 text-center">{ICONS[t]}</span>{t}
+          {t === 'Review Centre' && ov?.pending_approvals > 0 && <span className={'ml-auto text-xs font-bold rounded-full px-2 py-0.5 ' + (t === tab ? 'bg-white text-[#8f6a33]' : 'bg-[#c59d5f] text-white')}>{ov.pending_approvals}</span>}
+        </button>)}</div>
+        <div className="rounded-xl border border-white/10 px-3 py-2.5 flex items-center gap-3 mt-4">
+          <div className="w-8 h-8 rounded-full bg-[#c59d5f] text-white flex items-center justify-center text-sm font-bold">B</div>
+          <div><div className="text-sm text-white font-medium leading-tight">Bhavesh</div><div className="text-[11px] text-[#c59d5f]">Active</div></div>
+        </div>
+      </nav>
+      <div className="flex-1 min-w-0 flex bg-white rounded-3xl overflow-hidden">
+        <main className="flex-1 min-w-0 p-6 md:p-8 overflow-y-auto">
+          <h1 className="text-3xl font-bold text-[#19191b]">{tab}</h1>
+          <div className="text-xs text-slate-500 mt-1 mb-6">{today}</div>
+          <Jobs /><Page key={tab} />
+        </main>
+        <ActivityPanel setTab={setTab} />
       </div>
-      <div className="p-3 flex-1">
-        <div className="px-3 pt-2 pb-2 text-[11px] uppercase tracking-wider text-[#67704f] font-semibold">Workspace</div>
-        {Object.keys(TABS).map((t) => <button key={t} onClick={() => setTab(t)}
-          className={'flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium mb-1 transition border-r-4 ' + (t === tab
-            ? 'bg-[#232819] text-[#f1f5e3] border-[#b6e68a]' : 'border-transparent hover:bg-[#181b11] hover:text-[#f1f5e3]')}>
-          <span className="text-base w-5 text-center text-[#8a9570]">{ICONS[t]}</span>{t}
-          {t === 'Review Centre' && ov?.pending_approvals > 0 && <span className="ml-auto bg-[#b6e68a] text-[#0d0f09] text-xs font-bold rounded-full px-2 py-0.5">{ov.pending_approvals}</span>}
-        </button>)}
-      </div>
-      <div className="p-4 border-t border-[#2a3020] text-xs text-[#67704f]">All emails are delivered to your own inbox only, after your approval.</div>
-    </nav>
-    <main className="flex-1 min-w-0">
-      <header className="bg-[#1a1e13] border-b border-[#2a3020] px-8 py-4 flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold text-slate-900">{tab}</h1><div className="text-xs text-slate-500 mt-0.5">{today}</div></div>
-        {ov && <div className="flex gap-6 text-right">
-          {[['Companies', ov.discovered], ['Qualified', ov.qualified], ['Sent', ov.sent]].map(([k, v]) => <div key={k}>
-            <div className="text-xl font-bold text-slate-900 leading-none">{v}</div><div className="text-[11px] uppercase tracking-wide text-slate-500 mt-1">{k}</div></div>)}</div>}
-      </header>
-      <div className="p-8 max-w-6xl"><Jobs /><Page key={tab} /></div>
-    </main>
+    </div>
   </div>
 }
