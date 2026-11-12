@@ -1,0 +1,187 @@
+# Eval for block 2: ICP definition (backend/app/modules/icp.py + prompts/icp_report.md).
+# Every case has the four parts: input, expected_behaviour, assertion, severity.
+#   input      what the stage is given (or what goes wrong)
+#   expected   what a correct stage does with it
+#   assertion  the exact, checkable condition (implemented by `check` in run_icp_eval.py)
+#   severity   critical = the pipeline must not run on a bad result (fails the run)
+#              major    = lowers lead quality; fix before trusting the output (warns; fails with --strict)
+#              minor    = polish
+# kind: report  -> checked against a real ICP report (latest stored, or --live to regenerate)
+#       offline -> uses a fixture below and the stage's code only (no API call)
+
+severity_levels: [critical, major, minor]
+
+cases:
+  # ---- A. Output contract -------------------------------------------------------------
+  - id: ICP-01
+    name: Report follows the documented schema
+    kind: report
+    input: "Default ICP prompt (prompts/icp_report.md) run with Google Search grounding, today's date."
+    expected_behaviour: "Returns one JSON object with summary (string), industries (list of {name, why}), funding_stages (string), buying_signals (list of {signal, why_it_matters}), compliance_triggers, enterprise_expansion_signals and search_queries (lists of strings)."
+    assertion: "All 7 keys exist with the right types; no list is empty; every industry and buying signal has non-empty text fields."
+    severity: critical
+    check: schema
+
+  - id: ICP-02
+    name: Summary is a usable ICP statement
+    kind: report
+    input: "Same run as ICP-01."
+    expected_behaviour: "A short summary that tells a reader who Sprinto sells to and why."
+    assertion: "summary has 2-6 sentences and mentions SaaS and at least one of SOC 2 / ISO 27001 / compliance."
+    severity: minor
+    check: summary_quality
+
+  # ---- B. Coverage of the five ICP elements in the brief --------------------------------
+  - id: ICP-03
+    name: Relevant SaaS industries are identified
+    kind: report
+    input: "Same run as ICP-01."
+    expected_behaviour: "At least three distinct industries/verticals, each with a reason compliance matters to them."
+    assertion: "industries has >= 3 entries with distinct names and a 'why' of at least 40 characters."
+    severity: major
+    check: industries
+
+  - id: ICP-04
+    name: Series A, B and C are all covered
+    kind: report
+    input: "Same run as ICP-01."
+    expected_behaviour: "funding_stages explains why the Series A-C band is the target."
+    assertion: "funding_stages mentions Series A, Series B and Series C (any wording such as 'Series A, B and C' or 'A to C')."
+    severity: critical
+    check: funding_stages
+
+  - id: ICP-05
+    name: Audit-preparation signals name both audit frameworks
+    kind: report
+    input: "Same run as ICP-01."
+    expected_behaviour: "The report describes companies preparing for SOC 2 and ISO 27001 audits."
+    assertion: "The report text contains 'SOC 2' and 'ISO 27001' (or '27001') at least once each."
+    severity: critical
+    check: audit_frameworks
+
+  - id: ICP-06
+    name: Enterprise-expansion signals are present
+    kind: report
+    input: "Same run as ICP-01."
+    expected_behaviour: "Concrete signs that a company is moving upmarket."
+    assertion: "enterprise_expansion_signals has >= 2 items and at least one mentions enterprise, upmarket, Fortune or large customers."
+    severity: major
+    check: enterprise_signals
+
+  - id: ICP-07
+    name: Rising security / compliance pressure is described
+    kind: report
+    input: "Same run as ICP-01."
+    expected_behaviour: "Triggers that raise security and compliance requirements (customer demands, audits, regulation)."
+    assertion: "compliance_triggers has >= 2 items and at least one mentions customers/buyers, questionnaires, audits or regulation."
+    severity: major
+    check: compliance_triggers
+
+  - id: ICP-08
+    name: Buying signals are specific and observable
+    kind: report
+    input: "Same run as ICP-01."
+    expected_behaviour: "Signals the later stages can actually verify (for example security or GRC hiring, funding, trust-centre launch)."
+    assertion: "buying_signals has >= 3 entries with signal + why_it_matters, and at least one is about hiring/roles or funding."
+    severity: major
+    check: buying_signals
+
+  # ---- C. Grounding and honesty ---------------------------------------------------------
+  - id: ICP-09
+    name: The report is backed by real, distinct sources
+    kind: report
+    input: "Grounding sources stored with the report."
+    expected_behaviour: "Google Search grounding returned real pages from several sites."
+    assertion: ">= 3 sources, >= 3 distinct hostnames, all http(s), and at least one is not a vertexaisearch redirect."
+    severity: critical
+    check: sources
+
+  - id: ICP-10
+    name: No invented statistics
+    kind: report
+    input: "Same run as ICP-01; the prompt says 'Do not invent statistics'."
+    expected_behaviour: "Qualitative description only; no percentages or dollar figures presented as facts."
+    assertion: "No '%' figures and no '$' amounts appear anywhere in the report text."
+    severity: major
+    check: no_statistics
+
+  - id: ICP-11
+    name: No stale time references
+    kind: report
+    input: "Same run as ICP-01 on the current date."
+    expected_behaviour: "The ICP reflects the market 'right now'."
+    assertion: "No year earlier than 2024 appears in the report text."
+    severity: minor
+    check: no_stale_years
+
+  # ---- D. Usable by the next block ------------------------------------------------------
+  - id: ICP-12
+    name: Search queries can drive discovery
+    kind: report
+    input: "Same run as ICP-01."
+    expected_behaviour: "3-5 concrete, non-duplicate search phrasings relevant to the ICP."
+    assertion: "3 <= len(search_queries) <= 5; each has >= 3 words; no duplicates; at least one mentions SOC 2, ISO, compliance or Series."
+    severity: major
+    check: search_queries
+
+  - id: ICP-13
+    name: Discovery receives a clean ICP summary
+    kind: report
+    input: "The report is stored, then discovery asks icp.summary_text() for context."
+    expected_behaviour: "A non-empty plain-text summary that fits the discovery prompt."
+    assertion: "summary_text returns the report's summary string, 20-1500 characters."
+    severity: major
+    check: summary_text
+
+  # ---- E. Robustness (fixtures, no API call) --------------------------------------------
+  - id: ICP-14
+    name: JSON wrapped in code fences and prose is still parsed
+    kind: offline
+    input: "A model reply that wraps the JSON in markdown fences with a sentence before and after."
+    expected_behaviour: "The parser extracts the JSON object instead of failing."
+    assertion: "llm.parse_json(reply) returns a dict whose summary equals the fixture's summary."
+    severity: critical
+    check: parse_fenced
+    fixture:
+      reply: "Here is the report you asked for:\n```json\n{\"summary\": \"Series A-C SaaS teams preparing for SOC 2.\", \"industries\": []}\n```\nHope this helps!"
+      summary: "Series A-C SaaS teams preparing for SOC 2."
+
+  - id: ICP-15
+    name: A non-JSON reply is rejected and nothing is stored
+    kind: offline
+    input: "The model replies in plain prose with no JSON."
+    expected_behaviour: "The stage fails loudly; no ICP row is written, so discovery never runs on garbage."
+    assertion: "icp.run raises ValueError and the icp_reports table is still empty."
+    severity: critical
+    check: reject_non_json
+    fixture:
+      reply: "Sprinto should target fast-growing companies. I could not format this as JSON, sorry."
+
+  - id: ICP-16
+    name: A skeletal or empty report is rejected
+    kind: offline
+    input: "The model returns valid JSON that is nearly empty: an empty industries list, no signals, no queries."
+    expected_behaviour: "The stage refuses to store it and says what is missing."
+    assertion: "icp.run raises ValueError naming the empty fields and the icp_reports table is still empty."
+    severity: critical
+    check: reject_skeletal
+    fixture:
+      report: {summary: "", industries: [], funding_stages: "", buying_signals: [], compliance_triggers: [], enterprise_expansion_signals: [], search_queries: []}
+
+  - id: ICP-17
+    name: A valid report is stored with its sources and is retrievable
+    kind: offline
+    input: "A complete valid report plus two grounding source URLs."
+    expected_behaviour: "icp.run stores it; icp.latest() returns the same report and sources."
+    assertion: "latest()['report'] equals the input report and latest()['sources'] equals the sorted sources."
+    severity: major
+    check: persist_roundtrip
+
+  - id: ICP-18
+    name: Discovery still works before any ICP exists
+    kind: offline
+    input: "A fresh database with no ICP report."
+    expected_behaviour: "summary_text falls back to a sensible default instead of crashing."
+    assertion: "summary_text() on an empty database returns a non-empty string mentioning SaaS."
+    severity: major
+    check: fallback_summary
