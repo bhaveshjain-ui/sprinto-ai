@@ -347,7 +347,7 @@ function Integrations() {
   </>
 }
 
-const TABS = { 'Company Research': Research, 'Qualified Leads': Leads, Overview, 'My Activity': Activity, 'ICP Discovery': Icp, 'Review Centre': Review, 'Sent Emails': Sent, Integrations }
+const TABS = { Overview, 'Company Research': Research, 'Qualified Leads': Leads, 'My Activity': Activity, 'ICP Discovery': Icp, 'Review Centre': Review, 'Sent Emails': Sent, Integrations }
 const ICONS = { Overview: '◈', 'My Activity': '◷', 'ICP Discovery': '◎', 'Company Research': '⌕', 'Qualified Leads': '★', 'Review Centre': '✉', 'Sent Emails': '➤', Integrations: '⚙' }
 
 function Activity({ setTab }) {
