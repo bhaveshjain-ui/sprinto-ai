@@ -351,3 +351,69 @@ def test_hunter_enrich_survives_api_failure(c, monkeypatch):
 def test_employee_range_scores_as_midpoint():
     assert scoring._num("51-250") == 150 and scoring._num("11 - 50") == 30
     assert scoring._num("140 employees (Hunter estimate, range 51-250)") == 140
+
+
+# ---- Postgres connection that Neon closed while idle (the cause of the "site runs empty" outage) ----
+def _fake_pg(monkeypatch, scripts):
+    """Each connect() returns a fake connection; scripts[i] says whether that connection's statements fail."""
+    import psycopg
+
+    opened = []
+
+    class Cur:
+        description = None
+        rowcount = 1
+
+        def __init__(self, broken):
+            self.broken, self.sql = broken, []
+
+        def execute(self, sql, params=None):
+            if self.broken:
+                raise psycopg.OperationalError("SSL SYSCALL error: EOF detected")
+            self.sql.append(sql)
+
+    class Raw:
+        def __init__(self, broken):
+            self.broken, self.closed = broken, False
+
+        def cursor(self):
+            return Cur(self.broken)
+
+        def execute(self, sql):
+            if self.broken:
+                raise psycopg.OperationalError("SSL SYSCALL error: EOF detected")
+
+        def close(self):
+            self.closed = True
+
+        @property
+        def info(self):  # a dead connection reports UNKNOWN, which must not be mistaken for "in a transaction"
+            raise AssertionError("connection state must not be consulted")
+
+    def fake_connect(*a, **k):
+        raw = Raw(scripts[len(opened)])
+        opened.append(raw)
+        return raw
+
+    monkeypatch.setattr(db.psycopg, "connect", fake_connect)
+    return opened
+
+
+def test_pg_reconnects_when_neon_dropped_the_connection(monkeypatch):
+    opened = _fake_pg(monkeypatch, [True, False])  # first connection is dead, the second works
+    conn = db.PgConn("postgresql://x")
+    conn.execute("SELECT 1")  # must transparently reconnect instead of raising
+    assert len(opened) == 2
+
+
+def test_pg_does_not_retry_inside_a_transaction(monkeypatch):
+    opened = _fake_pg(monkeypatch, [False, False])
+    conn = db.PgConn("postgresql://x")
+    conn.execute("BEGIN IMMEDIATE")
+    opened[0].broken = True  # connection dies mid-transaction
+    with pytest.raises(db.psycopg.OperationalError):
+        conn.execute("SELECT 1")
+    assert len(opened) == 1  # no silent reconnect: the transaction's state would be lost
+    conn.rollback()  # must not raise on a dead connection
+    conn.execute("SELECT 1")  # after the failed transaction is cleared, reconnecting is allowed again
+    assert len(opened) == 2

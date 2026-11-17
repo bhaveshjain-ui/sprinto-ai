@@ -179,6 +179,7 @@ class PgConn:
 
     def __init__(self, url: str):
         self.url = url
+        self._txn = False  # True only between our own BEGIN and COMMIT/ROLLBACK
         self._open()
 
     def _open(self):
@@ -190,13 +191,17 @@ class PgConn:
         try:
             cur = self.raw.cursor()
             cur.execute(s, list(params) if params else None)
-        except psycopg.OperationalError:  # Neon closes idle connections; reconnect once (outside transactions only)
-            if s == "BEGIN" or self._in_txn():
+        except (psycopg.OperationalError, psycopg.InterfaceError):
+            # Neon closes idle connections, so a reused connection can be dead. Reconnect and retry once, but never
+            # inside a transaction we opened (its state is lost). A dead connection reports an UNKNOWN status, so we
+            # track our own transactions instead of asking the connection.
+            if self._txn:
                 raise
             self._open()
             cur = self.raw.cursor()
             cur.execute(s, list(params) if params else None)
         if s == "BEGIN":
+            self._txn = True
             cur.execute("LOCK TABLE sends IN SHARE ROW EXCLUSIVE MODE")
         return PgCursor(cur, ret)
 
@@ -204,12 +209,17 @@ class PgConn:
         return self.raw.info.transaction_status != psycopg.pq.TransactionStatus.IDLE
 
     def commit(self):
-        if self._in_txn():
+        if self._txn:
+            self._txn = False
             self.raw.execute("COMMIT")
 
     def rollback(self):
-        if self._in_txn():
-            self.raw.execute("ROLLBACK")
+        if self._txn:
+            self._txn = False
+            try:
+                self.raw.execute("ROLLBACK")
+            except (psycopg.OperationalError, psycopg.InterfaceError):
+                pass  # connection already gone: the server rolled the transaction back
 
     def close(self):
         try:
