@@ -330,14 +330,14 @@ function Sent() {
       {list?.length === 0 && <p className="text-sm text-slate-500">No emails sent yet.</p>}</Card></>
 }
 
-function Settings() {
+function Integrations() {
   const [s, load] = useData('/settings')
   const [tests, setTests] = useState({})
   const test = async (n) => { setTests((t) => ({ ...t, [n]: '...' })); const r = await api('/selftest/' + n, { method: 'POST' }); setTests((t) => ({ ...t, [n]: (r.ok ? 'OK' : 'FAILED') + (r.detail ? ' - ' + (typeof r.detail === 'string' ? r.detail : JSON.stringify(r.detail)) : '') })) }
   const relevant = s ? Object.entries(s.integrations).filter(([k]) => !(s.cloud && s.local_only?.includes(k))) : []
   const on = relevant.filter(([, v]) => v).length
   return <>
-    <Card title="Integrations (keys live in the backend .env, never in the browser)" accent="from-sky-400 to-indigo-500"
+    <Card title="Connected services (keys stay in the backend, never in the browser)" accent="from-sky-400 to-indigo-500"
       right={s && <Gauge value={(on / Math.max(relevant.length, 1)) * 100} size={60} />}>
       <table className="w-full text-sm"><tbody>{s && Object.entries(s.integrations).map(([k, v]) => <tr key={k} className="border-t border-slate-100">
         <td className="py-2 font-mono">{k}</td><td>{s.cloud && s.local_only?.includes(k) ? <><Badge v="VERIFIED" /> <span className="text-slate-500 text-sm">runs locally, not needed here</span></> : <><Badge v={v ? 'VERIFIED' : 'NOT_FOUND'} /> {v ? 'configured' : 'missing'}</>}</td>
@@ -347,8 +347,8 @@ function Settings() {
   </>
 }
 
-const TABS = { 'Company Research': Research, 'Qualified Leads': Leads, Overview, 'My Activity': Activity, 'ICP Discovery': Icp, 'Review Centre': Review, 'Sent Emails': Sent, Settings }
-const ICONS = { Overview: '◈', 'My Activity': '◷', 'ICP Discovery': '◎', 'Company Research': '⌕', 'Qualified Leads': '★', 'Review Centre': '✉', 'Sent Emails': '➤', Settings: '⚙' }
+const TABS = { 'Company Research': Research, 'Qualified Leads': Leads, Overview, 'My Activity': Activity, 'ICP Discovery': Icp, 'Review Centre': Review, 'Sent Emails': Sent, Integrations }
+const ICONS = { Overview: '◈', 'My Activity': '◷', 'ICP Discovery': '◎', 'Company Research': '⌕', 'Qualified Leads': '★', 'Review Centre': '✉', 'Sent Emails': '➤', Integrations: '⚙' }
 
 function Activity({ setTab }) {
   const [drafts] = useData('/drafts?status=pending')
