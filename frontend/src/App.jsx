@@ -347,30 +347,27 @@ function Settings() {
   </>
 }
 
-const TABS = { 'Company Research': Research, 'Qualified Leads': Leads, Overview, 'ICP Discovery': Icp, 'Review Centre': Review, 'Sent Emails': Sent, Settings }
-const ICONS = { Overview: '◈', 'ICP Discovery': '◎', 'Company Research': '⌕', 'Qualified Leads': '★', 'Review Centre': '✉', 'Sent Emails': '➤', Settings: '⚙' }
+const TABS = { 'Company Research': Research, 'Qualified Leads': Leads, Overview, 'My Activity': Activity, 'ICP Discovery': Icp, 'Review Centre': Review, 'Sent Emails': Sent, Settings }
+const ICONS = { Overview: '◈', 'My Activity': '◷', 'ICP Discovery': '◎', 'Company Research': '⌕', 'Qualified Leads': '★', 'Review Centre': '✉', 'Sent Emails': '➤', Settings: '⚙' }
 
-function ActivityPanel({ setTab }) {
+function Activity({ setTab }) {
   const [drafts] = useData('/drafts?status=pending')
   const [sent] = useData('/sent')
   const [companies] = useData('/companies')
-  const Section = ({ title, to, children }) => <div className="mb-7">
-    <div className="flex items-center justify-between mb-3"><h3 className="font-semibold text-sm text-[#19191b]">{title}</h3>
-      <button onClick={() => setTab(to)} className="text-xs text-[#b38848] hover:underline">View all</button></div>
-    <div className="space-y-2.5">{children}</div></div>
-  const Item = ({ top, sub, badge }) => <div className="bg-white rounded-xl shadow-sm px-3.5 py-2.5 flex items-center gap-3">
+  const Block = ({ title, to, children }) => <Card title={title} right={<button onClick={() => setTab(to)} className="text-xs text-[#b38848] hover:underline">View all</button>}>
+    <div className="space-y-2.5">{children}</div></Card>
+  const Item = ({ top, sub, badge }) => <div className="bg-[#f7f1e8] rounded-xl px-3.5 py-2.5 flex items-center gap-3">
     <div className="min-w-0 flex-1"><div className="text-sm font-medium text-[#19191b] truncate">{top}</div><div className="text-[11px] text-slate-500 truncate">{sub}</div></div>{badge}</div>
-  const top = (companies || []).filter((c) => c.score != null).slice(0, 3)
-  return <aside className="hidden xl:block w-80 shrink-0 bg-[#f7f1e8] p-6 overflow-y-auto">
-    <h2 className="text-2xl font-bold text-[#19191b] mb-6">My activity</h2>
-    <Section title="Awaiting review" to="Review Centre">{(drafts || []).slice(0, 3).map((d) => <Item key={d.id} top={d.company.name}
+  const top = (companies || []).filter((c) => c.score != null).slice(0, 5)
+  return <div className="grid lg:grid-cols-3 gap-6">
+    <Block title="Awaiting review" to="Review Centre">{(drafts || []).slice(0, 5).map((d) => <Item key={d.id} top={d.company.name}
       sub={`${d.contact.first_name} ${d.contact.last_name} - ${d.contact.position}`} badge={<Badge v={d.company.priority} />} />)}
-      {drafts && drafts.length === 0 && <div className="text-xs text-slate-500">Nothing waiting.</div>}</Section>
-    <Section title="Top scored companies" to="Company Research">{top.map((c) => <Item key={c.id} top={c.name} sub={c.domain}
-      badge={<span className="text-sm font-bold text-[#8f6a33]">{c.score}</span>} />)}</Section>
-    <Section title="Latest sent" to="Sent Emails">{(sent || []).slice(0, 3).map((x) => <Item key={x.id} top={x.company} sub={x.subject} badge={<Badge v={x.status} />} />)}
-      {sent && sent.length === 0 && <div className="text-xs text-slate-500">No emails sent yet.</div>}</Section>
-  </aside>
+      {drafts && drafts.length === 0 && <div className="text-xs text-slate-500">Nothing waiting.</div>}</Block>
+    <Block title="Top scored companies" to="Company Research">{top.map((c) => <Item key={c.id} top={c.name} sub={c.domain}
+      badge={<span className="text-sm font-bold text-[#8f6a33]">{c.score}</span>} />)}</Block>
+    <Block title="Latest sent" to="Sent Emails">{(sent || []).slice(0, 5).map((x) => <Item key={x.id} top={x.company} sub={x.subject} badge={<Badge v={x.status} />} />)}
+      {sent && sent.length === 0 && <div className="text-xs text-slate-500">No emails sent yet.</div>}</Block>
+  </div>
 }
 
 export default function App() {
@@ -400,9 +397,8 @@ export default function App() {
         <main className="flex-1 min-w-0 p-6 md:p-8 overflow-y-auto">
           <h1 className="text-3xl font-bold text-[#19191b]">{tab}</h1>
           <div className="text-xs text-slate-500 mt-1 mb-6">{today}</div>
-          <Jobs /><Page key={tab} />
+          <Jobs /><Page key={tab} setTab={setTab} />
         </main>
-        <ActivityPanel setTab={setTab} />
       </div>
     </div>
   </div>
