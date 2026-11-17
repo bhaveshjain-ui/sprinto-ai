@@ -251,6 +251,7 @@ def test_research_attempt_limit(c, monkeypatch):
         return [], set()
 
     monkeypatch.setattr(research.llm, "generate", fake_generate)
+    monkeypatch.setattr(research, "hunter_enrich", lambda *a, **k: [])
     monkeypatch.setattr(research.scrape, "fetch", lambda conn, u: None)
     co = c.execute("SELECT * FROM companies WHERE id=1").fetchone()
     research.run_company(c, CFG, co)
@@ -266,6 +267,7 @@ def test_research_stops_when_verified(c, monkeypatch):
         return [], set()
 
     monkeypatch.setattr(research.llm, "generate", fake_generate)
+    monkeypatch.setattr(research, "hunter_enrich", lambda *a, **k: [])
     monkeypatch.setattr(research.scrape, "fetch", lambda conn, u: None)
     monkeypatch.setattr(research, "_verified", lambda conn, cid: set(research.CRITERIA))
     co = c.execute("SELECT * FROM companies WHERE id=1").fetchone()
@@ -289,3 +291,63 @@ def test_postgres_translation():
     t, _ = db.translate("SELECT 1 FROM cache WHERE created_at >= datetime('now', ?)", True)
     assert "%s::interval" in t
     assert "BIGSERIAL" in db.pg_schema() and "AUTOINCREMENT" not in db.pg_schema()
+
+
+# ---- Hunter company-enrichment gap fill ----
+ENRICH = {"data": {"indexedAt": "2026-11-16", "metrics": {"employeesCount": 140, "employees": "51-250"},
+                   "tech": ["react-js", "amazon-web-services"], "tags": ["software", "recruiting software", "ai", "x"]}}
+
+
+def _enrich(c, monkeypatch, payload=ENRICH):
+    from app.modules import contacts
+
+    monkeypatch.setenv("HUNTER_API_KEY", "test-key")
+    monkeypatch.setattr(contacts, "_get", lambda conn, path, params: payload)
+    return research.hunter_enrich(c, CFG, c.execute("SELECT * FROM companies WHERE id=1").fetchone())
+
+
+def test_hunter_enrich_fills_only_what_the_record_supports(c, monkeypatch):
+    filled = _enrich(c, monkeypatch)
+    assert set(filled) == {"employee_count", "cloud", "industry"}
+    rows = {r["criterion"]: r for r in c.execute("SELECT * FROM facts WHERE method='hunter_enrichment'")}
+    assert rows["employee_count"]["value"].startswith("140 employees") and rows["employee_count"]["status"] == "VERIFIED"
+    assert rows["cloud"]["value"] == "AWS" and "amazon-web-services" in rows["cloud"]["snippet"]
+    assert rows["industry"]["value"] == "software, recruiting software, ai"
+    assert all(r["origin"] == "hunter_api" and r["attempt"] == 5 and r["page_date"] == "2026-11-16" for r in rows.values())
+    assert "domain=acme.com" in rows["cloud"]["source_url"] and "api_key" not in rows["cloud"]["source_url"]
+
+
+def test_hunter_enrich_never_guesses(c, monkeypatch):
+    # no headcount, no cloud tech, no tags -> nothing is invented
+    assert _enrich(c, monkeypatch, {"data": {"metrics": {}, "tech": ["react-js"], "tags": []}}) == []
+    assert c.execute("SELECT COUNT(*) FROM facts WHERE method='hunter_enrichment'").fetchone()[0] == 0
+
+
+def test_hunter_enrich_skips_already_verified_and_missing_key(c, monkeypatch):
+    c.execute("INSERT INTO facts (company_id, criterion, value, status) VALUES (1,'employee_count','120','VERIFIED')")
+    c.execute("INSERT INTO facts (company_id, criterion, value, status) VALUES (1,'cloud','GCP','VERIFIED')")
+    c.execute("INSERT INTO facts (company_id, criterion, value, status) VALUES (1,'industry','fintech','VERIFIED')")
+    c.commit()
+    assert _enrich(c, monkeypatch) == []
+    monkeypatch.delenv("HUNTER_API_KEY")
+    from app.modules import contacts
+
+    monkeypatch.setattr(contacts, "_get", lambda *a, **k: pytest.fail("must not call Hunter without a key"))
+    assert research.hunter_enrich(c, CFG, c.execute("SELECT * FROM companies WHERE id=1").fetchone()) == []
+
+
+def test_hunter_enrich_survives_api_failure(c, monkeypatch):
+    from app.modules import contacts
+
+    monkeypatch.setenv("HUNTER_API_KEY", "test-key")
+
+    def boom(*a, **k):
+        raise RuntimeError("Hunter companies/find failed (404)")
+
+    monkeypatch.setattr(contacts, "_get", boom)
+    assert research.hunter_enrich(c, CFG, c.execute("SELECT * FROM companies WHERE id=1").fetchone()) == []
+
+
+def test_employee_range_scores_as_midpoint():
+    assert scoring._num("51-250") == 150 and scoring._num("11 - 50") == 30
+    assert scoring._num("140 employees (Hunter estimate, range 51-250)") == 140

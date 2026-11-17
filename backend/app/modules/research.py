@@ -126,6 +126,8 @@ def run_company(conn, cfg, company) -> dict:
             _check(conn, cfg, company, facts, grounding, "grounding", attempt, method)
         log(attempt, method, targets)
 
+    if cfg["research"].get("hunter_enrichment", True):
+        hunter_enrich(conn, cfg, company)
     _flag_conflicts(conn, cid)
     have = {r["criterion"] for r in conn.execute("SELECT criterion FROM facts WHERE company_id=?", (cid,))}
     for c in ALL_CRITERIA:
@@ -159,3 +161,55 @@ def reverify(conn, cfg, company) -> int:
     _flag_conflicts(conn, company["id"])
     conn.commit()
     return fixed
+
+
+CLOUD_TECH = {"amazon-web-services": "AWS", "google-cloud": "GCP", "google-cloud-platform": "GCP", "microsoft-azure": "Azure"}
+
+
+def hunter_enrich(conn, cfg, company) -> list[str]:
+    """Fifth, structured method for criteria still unverified after the four searches: Hunter's company-enrichment
+    record (employee estimate, tech stack, industry tags). One cheap API call, no scraping. Returns criteria filled."""
+    import json
+
+    from app.config import has_env
+    from app.modules import contacts
+
+    cid = company["id"]
+    if not has_env("HUNTER_API_KEY"):
+        return []
+    need = [c for c in ("employee_count", "cloud", "industry") if c not in _verified(conn, cid)]
+    if not need:
+        return []
+    try:
+        data = contacts._get(conn, "companies/find", {"domain": company["domain"]}).get("data") or {}
+    except Exception:  # not found / quota: leave the criteria UNVERIFIED rather than guessing
+        return []
+    m, tech, tags = data.get("metrics") or {}, data.get("tech") or [], data.get("tags") or []
+    indexed = (data.get("indexedAt") or "")[:10] or None
+    found = {}
+    cnt, rng = m.get("employeesCount"), m.get("employees")
+    if cnt:
+        found["employee_count"] = (f"{cnt} employees (Hunter estimate, range {rng})", f'"employeesCount": {cnt}, "employees": "{rng}"')
+    elif rng:
+        found["employee_count"] = (f"{rng} employees (Hunter range)", f'"employees": "{rng}"')
+    clouds = [(t, CLOUD_TECH[t]) for t in tech if t in CLOUD_TECH]
+    if clouds:
+        found["cloud"] = (", ".join(sorted({n for _, n in clouds})), f'"tech": {json.dumps([t for t, _ in clouds])}')
+    if tags:
+        found["industry"] = (", ".join(tags[:3]), f'"tags": {json.dumps(tags[:3])}')
+    filled = []
+    src = f"https://api.hunter.io/v2/companies/find?domain={company['domain']}"
+    for crit in need:
+        if crit not in found:
+            continue
+        value, snippet = found[crit]
+        conn.execute(
+            "INSERT INTO facts (company_id, criterion, value, source_url, snippet, origin, status, status_reason,"
+            " page_date, retrieved_at, attempt, method) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (cid, crit, value, src, snippet, "hunter_api", "VERIFIED",
+             f"Hunter company-enrichment record (structured third-party data, indexed {indexed})", indexed, _now(), 5, "hunter_enrichment"))
+        conn.execute("INSERT INTO research_log (company_id, criterion, attempt, method, outcome) VALUES (?,?,?,?,?)",
+                     (cid, crit, 5, "hunter_enrichment", "verified"))
+        filled.append(crit)
+    conn.commit()
+    return filled

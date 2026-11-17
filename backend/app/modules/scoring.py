@@ -8,6 +8,9 @@ from app import db
 
 
 def _num(value: str) -> int | None:
+    r = re.match(r"\s*(\d[\d,]*)\s*[-–]\s*(\d[\d,]*)", value or "")  # "51-250" -> midpoint
+    if r:
+        return (int(r.group(1).replace(",", "")) + int(r.group(2).replace(",", ""))) // 2
     m = re.search(r"\d[\d,]*", value or "")
     return int(m.group().replace(",", "")) if m else None
 
