@@ -216,8 +216,12 @@ def process_one(cid: int, force: bool = True):
 
 @app.get("/api/companies")
 def companies():
-    return rows(conn(), "SELECT id, domain, name, origin, status, stage, stop_reason, score, classification, priority,"
-                        " researched_at FROM companies ORDER BY COALESCE(score,-1) DESC, id")
+    out = rows(conn(), "SELECT id, domain, name, origin, status, stage, stop_reason, score, classification, priority,"
+                       " researched_at, score_detail FROM companies ORDER BY COALESCE(score,-1) DESC, id")
+    for r in out:  # which criteria are still unverified: tells you what "further investigation" actually needs
+        detail = json.loads(r.pop("score_detail") or "{}").get("detail", {})
+        r["missing"] = [k for k, v in detail.items() if v.get("state") in ("unverified", "conflict")]
+    return out
 
 
 @app.get("/api/companies/{cid}")

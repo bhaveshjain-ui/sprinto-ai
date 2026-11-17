@@ -91,7 +91,7 @@ const BADGE = { VERIFIED: 'bg-emerald-500 text-white', qualified: 'bg-emerald-50
   rejected: 'bg-rose-500 text-white', stopped: 'bg-rose-500 text-white', failed: 'bg-rose-500 text-white',
   Low: 'bg-slate-400 text-white', NOT_FOUND: 'bg-slate-300 text-slate-700', approved: 'bg-sky-500 text-white',
   lead: 'bg-violet-500 text-white', drafted: 'bg-fuchsia-500 text-white', shortlisted: 'bg-indigo-500 text-white',
-  researched: 'bg-sky-500 text-white', filtered: 'bg-slate-400 text-white', no_contact: 'bg-amber-400 text-amber-950', dry_run: 'bg-slate-400 text-white' }
+  researched: 'bg-sky-500 text-white', filtered: 'bg-slate-400 text-white', promising: 'bg-amber-400 text-amber-950', needs_data: 'bg-slate-400 text-white', no_contact: 'bg-amber-400 text-amber-950', dry_run: 'bg-slate-400 text-white' }
 const Badge = ({ v }) => <span className={'px-2.5 py-0.5 rounded-full text-xs font-bold ' + (BADGE[v] || 'bg-slate-200 text-slate-700')}>{String(v).replaceAll('_', ' ')}</span>
 const Link = ({ href }) => href ? <a className="text-violet-600 hover:text-fuchsia-600 underline break-all" href={href} target="_blank" rel="noreferrer">{href}</a> : '-'
 
@@ -235,7 +235,8 @@ function Research() {
       <tbody>{list?.map((c) => <tr key={c.id} className="border-t border-slate-100 cursor-pointer hover:bg-violet-50" onClick={() => setOpen(c.id)}>
         <td className="py-2.5"><b>{c.name}</b><div className="text-xs text-slate-500">{c.domain}</div></td><td>{c.origin}</td><td><Badge v={c.status === 'stopped' ? (c.stage === 'shortlist' ? 'filtered' : c.stage === 'score' ? 'rejected' : 'no_contact') : c.status} /></td>
         <td>{c.score != null ? <div className="flex items-center gap-2 w-28"><div className="flex-1 h-2.5 bg-slate-200 rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: c.score + '%', background: c.score >= 75 ? C.emerald : c.score >= 55 ? C.amber : C.rose }} /></div><b>{c.score}</b></div> : '-'}</td>
-        <td>{c.classification && <Badge v={c.classification} />}</td><td>{c.priority && <Badge v={c.priority} />}</td>
+        <td>{c.classification && <Badge v={c.classification === 'further_investigation' ? (c.score >= 55 ? 'promising' : 'needs_data') : c.classification} />}
+          {c.classification === 'further_investigation' && c.missing?.length > 0 && <div className="text-[11px] text-slate-500 mt-1 max-w-48">Missing: {c.missing.map((m) => m.replaceAll('_', ' ')).join(', ')}</div>}</td><td>{c.priority && <Badge v={c.priority} />}</td>
         <td className="text-slate-600 max-w-72 text-xs">{c.stop_reason}</td></tr>)}</tbody></table>
     {list?.length === 0 && <p className="text-sm text-slate-500">No companies yet. Run discovery or add domains on Overview.</p>}
   </Card>
