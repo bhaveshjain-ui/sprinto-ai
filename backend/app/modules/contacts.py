@@ -7,7 +7,8 @@ from app import cache, db
 from app.config import env
 
 TIERS = {
-    "founder": r"founder|co-?founder|\bceo\b|chief executive",
+    # the top leader of a small company: founder/CEO, and equivalents such as Managing Director or Owner
+    "founder": r"founder|co-?founder|\bceo\b|chief executive|managing director|\bowner\b|general manager|(?<!vice )(?<!vice-)\bpresident\b",
     "cto": r"\bcto\b|chief technology|head of engineering|vp.{0,3}engineering",
     "ciso": r"\bciso\b|chief information security|chief security",
     "head_infosec": r"head of (information )?security|(director|vp).{0,15}security|infosec|information security",
@@ -63,8 +64,9 @@ def _get(conn, path: str, params: dict):
     return cache.get_or_set(conn, "hunter", key, do, ttl_days=30)
 
 
-def domain_search(conn, domain: str) -> list[dict]:
-    data = _get(conn, "domain-search", {"domain": domain, "limit": 10})
+def domain_search(conn, domain: str, **filters) -> list[dict]:
+    """Hunter's free plan returns at most 10 people per search; filters (e.g. seniority) choose WHICH 10."""
+    data = _get(conn, "domain-search", {"domain": domain, "limit": 10, **filters})
     return data.get("data", {}).get("emails", [])
 
 
@@ -80,15 +82,35 @@ def employee_count(conn, company_id: int) -> int | None:
     return int(m.group().replace(",", "")) if m else None
 
 
+# Searches to try, in order. The first is Hunter's default; the second (one extra credit, only when the first finds
+# nobody usable) asks for executive/senior people so the 10-result cap is not spent on sales and engineering staff.
+SEARCHES = ({}, {"seniority": "executive,senior"})
+
+
 def run_company(conn, cfg, company, search=domain_search, verifier=verify_email) -> dict | None:
     cid = company["id"]
     emps = employee_count(conn, cid)
-    ranked = rank(search(conn, company["domain"]), emps, cfg["contacts"]["min_confidence"])
+    min_conf = cfg["contacts"]["min_confidence"]
+    pool, seen, verdicts, chosen, ranked, via = [], set(), {}, None, [], {}
+    for flt in SEARCHES[: 2 if cfg["contacts"].get("retry_filtered", True) else 1]:
+        for cand in search(conn, company["domain"], **flt):
+            if cand.get("value") and cand["value"] not in seen:
+                seen.add(cand["value"])
+                pool.append(cand)
+                via[cand["value"]] = "hunter.io domain-search" + (f" ({', '.join(f'{k}={v}' for k, v in flt.items())})" if flt else "")
+        ranked = rank(pool, emps, min_conf)
+        for cand in ranked:  # best-ranked first; the first address Hunter's verifier calls valid wins
+            if cand["value"] not in verdicts:
+                verdicts[cand["value"]] = verifier(conn, cand["value"])
+            if verdicts[cand["value"]] == "valid":
+                chosen = cand
+                break
+        if chosen:
+            break
     conn.execute("DELETE FROM contacts WHERE company_id=?", (cid,))
-    chosen = None
     for c in ranked:
-        status = verifier(conn, c["value"])
-        picked = chosen is None and status == "valid"
+        status = verdicts.get(c["value"], "not_checked")
+        picked = chosen is not None and c["value"] == chosen["value"]
         reasoning = (f"{c['position']} matches tier '{c['tier']}' (rank {c['rank'] + 1} for "
                      f"{'unknown' if emps is None else emps} employees); Hunter confidence {c.get('confidence')}; "
                      f"email verifier: {status}")
@@ -96,13 +118,10 @@ def run_company(conn, cfg, company, search=domain_search, verifier=verify_email)
             "INSERT INTO contacts (company_id, first_name, last_name, email, position, confidence, verification,"
             " source, selected, reasoning) VALUES (?,?,?,?,?,?,?,?,?,?)",
             (cid, c["first_name"], c["last_name"], c["value"], c["position"], c.get("confidence"), status,
-             "hunter.io domain-search", int(picked), reasoning))
-        if picked:
-            chosen = c
+             via.get(c["value"], "hunter.io domain-search"), int(picked), reasoning))
     conn.commit()
     if not chosen:
-        db.stop(conn, cid, "contact", "no relevant contact with valid email and confidence >= "
-                f"{cfg['contacts']['min_confidence']}")
+        db.stop(conn, cid, "contact", "no relevant contact with valid email and confidence >= " f"{min_conf}")
         return None
     db.log_decision(conn, cid, "contact", "selected", f"{chosen['first_name']} {chosen['last_name']}")
     return chosen

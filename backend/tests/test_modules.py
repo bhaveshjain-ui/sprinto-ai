@@ -417,3 +417,67 @@ def test_pg_does_not_retry_inside_a_transaction(monkeypatch):
     conn.rollback()  # must not raise on a dead connection
     conn.execute("SELECT 1")  # after the failed transaction is cleared, reconnecting is allowed again
     assert len(opened) == 2
+
+
+# ---- contact selection: Hunter's 10-result cap, executive retry, and tier recognition ----
+def H2(first, pos, conf=80, email=None):
+    return {"first_name": first, "last_name": "Doe", "position": pos, "value": email or f"{first.lower()}@acme.com", "confidence": conf}
+
+
+def _contact_env(c):
+    c.execute("INSERT INTO facts (company_id, criterion, value, status) VALUES (1,'employee_count','30','VERIFIED')")
+    c.commit()
+    return c.execute("SELECT * FROM companies WHERE id=1").fetchone()
+
+
+def test_managing_director_counts_as_the_top_leader_but_vice_president_does_not():
+    assert contacts.tier_of("Managing Director") == "founder" and contacts.tier_of("Owner") == "founder"
+    assert contacts.tier_of("President") == "founder"
+    assert contacts.tier_of("Vice President of Sales") is None and contacts.tier_of("Vice-President, Growth") is None
+    assert contacts.tier_of("Chief Commercial Officer") is None
+
+
+def test_contact_retries_with_an_executive_search_only_when_the_first_finds_nobody(c):
+    co = _contact_env(c)
+    calls = []
+
+    def search(conn, domain, **flt):
+        calls.append(flt)
+        return [H2("Sam", "Account Executive")] if not flt else [H2("Mia", "Managing Director")]
+
+    chosen = contacts.run_company(c, CFG, co, search=search, verifier=lambda conn, e: "valid")
+    assert chosen["first_name"] == "Mia" and calls == [{}, {"seniority": "executive,senior"}]
+    row = c.execute("SELECT * FROM contacts WHERE selected=1").fetchone()
+    assert "seniority=executive,senior" in row["source"] and row["email"] == "mia@acme.com"
+
+
+def test_contact_does_not_spend_a_second_search_when_the_first_works(c):
+    co = _contact_env(c)
+    calls = []
+
+    def search(conn, domain, **flt):
+        calls.append(flt)
+        return [H2("Cy", "CTO")]
+
+    assert contacts.run_company(c, CFG, co, search=search, verifier=lambda conn, e: "valid")["first_name"] == "Cy"
+    assert calls == [{}]
+
+
+def test_contact_stops_with_a_reason_when_nobody_is_valid(c):
+    co = _contact_env(c)
+    out = contacts.run_company(c, CFG, co, search=lambda conn, d, **f: [H2("Cy", "CTO")], verifier=lambda conn, e: "invalid")
+    assert out is None
+    row = c.execute("SELECT status, stop_reason FROM companies WHERE id=1").fetchone()
+    assert row["status"] == "stopped" and "no relevant contact" in row["stop_reason"]
+
+
+def test_verifier_runs_only_until_the_first_valid_address(c):
+    co = _contact_env(c)
+    checked = []
+
+    def verifier(conn, email):
+        checked.append(email)
+        return "valid"
+
+    contacts.run_company(c, CFG, co, search=lambda conn, d, **f: [H2("Cy", "CTO"), H2("Al", "CISO")], verifier=verifier)
+    assert len(checked) == 1  # saves Hunter verification credits
