@@ -284,7 +284,7 @@ function Review() {
   return <><div className="flex gap-2 mb-5">{[['open', 'Awaiting review'], ['sent', 'Sent'], ['rejected', 'Rejected']].map(([k, label]) =>
     <button key={k} onClick={() => setFilter(k)} className={'px-4 py-2 rounded-lg text-sm font-semibold border transition ' + (filter === k ? 'bg-[#b6e68a] text-[#0d0f09] border-[#b6e68a]' : 'bg-white text-slate-700 border-slate-200 hover:border-slate-400')}>
       {label} <span className={'ml-1 text-xs rounded-full px-2 py-0.5 ' + (filter === k ? 'bg-black/15' : 'bg-slate-100')}>{count(k)}</span></button>)}</div>
-    {all.map((d) => { const e = edit[d.id]; return <Card key={d.id} title={`${d.company.name} -> ${d.contact.first_name} ${d.contact.last_name}`}
+    {filter === 'sent' ? <Sent /> : all.map((d) => { const e = edit[d.id]; return <Card key={d.id} title={`${d.company.name} -> ${d.contact.first_name} ${d.contact.last_name}`}
     right={<div className="flex gap-3 items-center"><Badge v={d.status} /><Badge v={d.company.priority} /><Gauge value={d.company.score} size={64} /></div>}>
     <div className="grid lg:grid-cols-2 gap-6 text-sm">
       <div className="space-y-4">
@@ -323,7 +323,7 @@ function Review() {
         {msg[d.id] && <p className="mt-2 text-sm font-medium text-rose-600">{msg[d.id]}</p>}
         <p className="text-xs text-slate-500 mt-3">Delivery goes only to your own address. An edit resets approval and is re-validated against verified facts.</p>
       </div></div></Card> })}
-    {all.length === 0 && <div className="bg-white rounded-2xl shadow-sm p-8 text-center text-slate-500 text-sm">{filter === 'open'
+    {filter !== 'sent' && all.length === 0 && <div className="bg-white rounded-2xl shadow-sm p-8 text-center text-slate-500 text-sm">{filter === 'open'
       ? 'No drafts awaiting review. Drafts appear here when a company scores 55 or above and has a verified contact. Companies scoring lower stay in Company Research.'
       : `No ${filter} drafts yet.`}</div>}</>
 }
@@ -357,28 +357,8 @@ function Integrations() {
   </>
 }
 
-const TABS = { Overview, 'Company Research': Research, 'Qualified Leads': Leads, 'My Activity': Activity, 'ICP Discovery': Icp, 'Review Centre': Review, 'Sent Emails': Sent, Integrations }
-const ICONS = { Overview: '◈', 'My Activity': '◷', 'ICP Discovery': '◎', 'Company Research': '⌕', 'Qualified Leads': '★', 'Review Centre': '✉', 'Sent Emails': '➤', Integrations: '⚙' }
-
-function Activity({ setTab }) {
-  const [drafts] = useData('/drafts?status=pending')
-  const [sent] = useData('/sent')
-  const [companies] = useData('/companies')
-  const Block = ({ title, to, children }) => <Card title={title} right={<button onClick={() => setTab(to)} className="text-xs text-[#b38848] hover:underline">View all</button>}>
-    <div className="space-y-2.5">{children}</div></Card>
-  const Item = ({ top, sub, badge }) => <div className="bg-[#f7f1e8] rounded-xl px-3.5 py-2.5 flex items-center gap-3">
-    <div className="min-w-0 flex-1"><div className="text-sm font-medium text-[#19191b] truncate">{top}</div><div className="text-[11px] text-slate-500 truncate">{sub}</div></div>{badge}</div>
-  const top = (companies || []).filter((c) => c.score != null).slice(0, 5)
-  return <div className="grid lg:grid-cols-3 gap-6">
-    <Block title="Awaiting review" to="Review Centre">{(drafts || []).slice(0, 5).map((d) => <Item key={d.id} top={d.company.name}
-      sub={`${d.contact.first_name} ${d.contact.last_name} - ${d.contact.position}`} badge={<Badge v={d.company.priority} />} />)}
-      {drafts && drafts.length === 0 && <div className="text-xs text-slate-500">Nothing waiting.</div>}</Block>
-    <Block title="Top scored companies" to="Company Research">{top.map((c) => <Item key={c.id} top={c.name} sub={c.domain}
-      badge={<span className="text-sm font-bold text-[#8f6a33]">{c.score}</span>} />)}</Block>
-    <Block title="Latest sent" to="Sent Emails">{(sent || []).slice(0, 5).map((x) => <Item key={x.id} top={x.company} sub={x.subject} badge={<Badge v={x.status} />} />)}
-      {sent && sent.length === 0 && <div className="text-xs text-slate-500">No emails sent yet.</div>}</Block>
-  </div>
-}
+const TABS = { Overview, 'Company Research': Research, 'Qualified Leads': Leads, 'ICP Discovery': Icp, 'Review Centre': Review, Integrations }
+const ICONS = { Overview: '◈', 'ICP Discovery': '◎', 'Company Research': '⌕', 'Qualified Leads': '★', 'Review Centre': '✉', Integrations: '⚙' }
 
 export default function App() {
   const [tab, setTab] = useState('Overview')
