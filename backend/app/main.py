@@ -224,6 +224,7 @@ def companies():
         comp = sd.get("compliance") or {}
         r["compliance"] = comp.get("status")
         r["compliance_frameworks"] = comp.get("frameworks") or []
+        r["compliance_unconfirmed"] = comp.get("unconfirmed_certified") or []
     return out
 
 

@@ -128,6 +128,8 @@ def run_company(conn, cfg, company) -> dict:
 
     if cfg["research"].get("hunter_enrichment", True):
         hunter_enrich(conn, cfg, company)
+    if cfg["research"].get("compliance_scan", True):
+        compliance_scan_step(conn, cfg, company)
     _flag_conflicts(conn, cid)
     have = {r["criterion"] for r in conn.execute("SELECT criterion FROM facts WHERE company_id=?", (cid,))}
     for c in ALL_CRITERIA:
@@ -213,3 +215,13 @@ def hunter_enrich(conn, cfg, company) -> list[str]:
         filled.append(crit)
     conn.commit()
     return filled
+
+
+def compliance_scan_step(conn, cfg, company) -> dict:
+    """Settle the compliance status from the company's own pages (see compliance_scan). Never fails the research."""
+    from app.modules import compliance_scan
+
+    try:
+        return compliance_scan.run(conn, cfg, company)
+    except Exception:  # a flaky page must not lose the rest of the research
+        return {}

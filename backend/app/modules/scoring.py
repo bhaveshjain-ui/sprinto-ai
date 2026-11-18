@@ -71,6 +71,12 @@ def score_facts(facts: list[dict], cfg: dict) -> dict:
         ver = [f for f in mine if f["status"] == "VERIFIED"]
         if crit == "audit_signals" and comp_status["status"] != "unknown":
             st = comp_status["status"]
+            if st == "none_found":  # their own trust pages claim nothing: probably still needs it, but absence is not proof
+                pts = round(weight * 0.6, 1)
+                detail[crit] = {"state": "positive", "points": pts, "max": weight, "evidence": comp_status["evidence"],
+                                "explanation": "NOT CERTIFIED (as far as their own trust pages show): likely still needs compliance"}
+                total += pts
+                continue
             if st == "certified":  # verified negative: nothing to sell them
                 detail[crit] = {"state": "negative", "points": 0, "max": weight, "evidence": comp_status["evidence"],
                                 "explanation": f"ALREADY COMPLIANT: {comp_status['reason']}. Not a target (low priority)."}

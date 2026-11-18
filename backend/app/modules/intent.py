@@ -35,13 +35,17 @@ def validate(res, valid_ids: set[int], cfg) -> tuple[list, list, list[str]]:
     return signals, pains[:2], errs
 
 
-def decide_priority(n_signals: int, classification: str | None, comp_status: str | None, cfg: dict) -> tuple[str, str]:
+def decide_priority(n_signals: int, classification: str | None, comp_status: str | None, cfg: dict,
+                    unconfirmed: list | None = None) -> tuple[str, str]:
     """Priority rubric. Already compliant -> Low. High needs a qualified score AND a company that still needs
     compliance; actively seeking compliance promotes a qualified Medium to High; a non-qualified company is capped at Medium."""
     ic = cfg["intent"]
     if comp_status == "certified":
         return "Low", "already compliant: Sprinto sells to companies that still need compliance"
     base = "High" if n_signals >= ic["high_min_signals"] else "Medium" if n_signals >= ic["medium_min_signals"] else "Low"
+    if unconfirmed:  # their own pages appear to claim certification but we could not confirm it: do not treat as a sure target
+        capped = "Medium" if base in ("High", "Medium") else base
+        return capped, f"unconfirmed claims that it already holds {', '.join(unconfirmed)}: check manually before contacting"
     if base == "High" and classification != "qualified":
         return "Medium", f"{n_signals} signals, but High needs a qualified score"
     if base == "Medium" and classification == "qualified" and comp_status == "in_progress":
@@ -61,7 +65,7 @@ def run_company(conn, cfg, company) -> dict:
     res, _ = llm.generate(conn, cfg, "intent", grounded=False, name=company["name"], facts=facts_block(facts))
     signals, pains, errs = validate(res, {f["id"] for f in facts}, cfg)
     n = len(signals)
-    priority, why = decide_priority(n, company["classification"], comp.get("status"), cfg)
+    priority, why = decide_priority(n, company["classification"], comp.get("status"), cfg, comp.get("unconfirmed_certified"))
     intent = {"signals": signals, "pain_points": pains, "priority": priority, "errors": errs, "reason": why}
     conn.execute("UPDATE companies SET intent=?, priority=? WHERE id=?", (json.dumps(intent), priority, company["id"]))
     if priority == "Low" or errs:

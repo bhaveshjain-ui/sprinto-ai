@@ -39,7 +39,7 @@ for co in rows:
             new.update(status="stopped", stage="intent", stop_reason=f"priority Low: already compliant ({', '.join(comp['frameworks']) or 'certified'})")
             action = "stopped: already compliant"
     elif co["intent"]:
-        new["priority"], _ = intent.decide_priority(n_signals, res["classification"], comp["status"], cfg)
+        new["priority"], _ = intent.decide_priority(n_signals, res["classification"], comp["status"], cfg, comp.get("unconfirmed_certified"))
     drafts = [d for d in conn.execute("SELECT id, status FROM drafts WHERE company_id=? AND status IN ('pending','approved')", (cid,))]
     to_reject = [d["id"] for d in drafts] if (comp["status"] == "certified" and not hard_rejected) else []
     rejected_total += len(to_reject)

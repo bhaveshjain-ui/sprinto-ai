@@ -91,7 +91,7 @@ const BADGE = { VERIFIED: 'bg-emerald-500 text-white', qualified: 'bg-emerald-50
   rejected: 'bg-rose-500 text-white', stopped: 'bg-rose-500 text-white', failed: 'bg-rose-500 text-white',
   Low: 'bg-slate-400 text-white', NOT_FOUND: 'bg-slate-300 text-slate-700', approved: 'bg-sky-500 text-white',
   lead: 'bg-violet-500 text-white', drafted: 'bg-fuchsia-500 text-white', shortlisted: 'bg-indigo-500 text-white',
-  researched: 'bg-sky-500 text-white', filtered: 'bg-slate-400 text-white', promising: 'bg-amber-400 text-amber-950', needs_data: 'bg-slate-400 text-white', low_priority: 'bg-slate-400 text-white', compliant: 'bg-slate-500 text-white', seeking: 'bg-emerald-500 text-white', no_draft: 'bg-amber-400 text-amber-950', no_contact: 'bg-amber-400 text-amber-950', dry_run: 'bg-slate-400 text-white' }
+  researched: 'bg-sky-500 text-white', filtered: 'bg-slate-400 text-white', promising: 'bg-amber-400 text-amber-950', needs_data: 'bg-slate-400 text-white', low_priority: 'bg-slate-400 text-white', compliant: 'bg-slate-500 text-white', seeking: 'bg-emerald-500 text-white', not_certified: 'bg-emerald-400 text-emerald-950', unknown: 'bg-slate-200 text-slate-600', no_draft: 'bg-amber-400 text-amber-950', no_contact: 'bg-amber-400 text-amber-950', dry_run: 'bg-slate-400 text-white' }
 const Badge = ({ v }) => <span className={'px-2.5 py-0.5 rounded-full text-xs font-bold ' + (BADGE[v] || 'bg-slate-200 text-slate-700')}>{String(v).replaceAll('_', ' ')}</span>
 const Link = ({ href }) => href ? <a className="text-violet-600 hover:text-fuchsia-600 underline break-all" href={href} target="_blank" rel="noreferrer">{href}</a> : '-'
 
@@ -225,6 +225,9 @@ function CompanyDetail({ id, onClose }) {
   </>
 }
 
+// Compliance status -> badge: certified is the only one that makes a company low priority
+const complianceBadge = (s) => ({ certified: 'compliant', in_progress: 'seeking', none_found: 'not_certified' }[s] || 'unknown')
+
 // What happened to the company, in plain words (the raw status 'further_investigation' now only means "scored below 55").
 const statusLabel = (c) => c.status === 'stopped'
   ? ({ shortlist: 'filtered', score: 'rejected', intent: 'low_priority', contact: 'no_contact', draft: 'no_draft' }[c.stage] || 'stopped')
@@ -241,8 +244,9 @@ function Research() {
         <td className="py-2.5"><b>{c.name}</b><div className="text-xs text-slate-500">{c.domain}</div></td><td>{c.origin}</td><td><Badge v={statusLabel(c)} /></td>
         <td>{c.score != null ? <div className="flex items-center gap-2 w-28"><div className="flex-1 h-2.5 bg-slate-200 rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: c.score + '%', background: c.score >= 75 ? C.emerald : c.score >= 55 ? C.amber : C.rose }} /></div><b>{c.score}</b></div> : '-'}</td>
         <td>{c.classification && <Badge v={c.classification === 'further_investigation' ? (c.score >= 55 ? 'promising' : 'needs_data') : c.classification} />}
-          {c.classification === 'further_investigation' && c.missing?.length > 0 && <div className="text-[11px] text-slate-500 mt-1 max-w-48">Missing: {c.missing.map((m) => m.replaceAll('_', ' ')).join(', ')}</div>}</td><td>{c.compliance && c.compliance !== 'unknown' && <><Badge v={c.compliance === 'certified' ? 'compliant' : 'seeking'} />
-          {c.compliance_frameworks?.length > 0 && <div className="text-[11px] text-slate-500 mt-1 max-w-32">{c.compliance_frameworks.slice(0, 3).join(', ')}</div>}</>}</td>
+          {c.classification === 'further_investigation' && c.missing?.length > 0 && <div className="text-[11px] text-slate-500 mt-1 max-w-48">Missing: {c.missing.map((m) => m.replaceAll('_', ' ')).join(', ')}</div>}</td><td>{c.compliance && <><Badge v={complianceBadge(c.compliance)} />
+          {c.compliance_frameworks?.length > 0 && <div className="text-[11px] text-slate-500 mt-1 max-w-32">{c.compliance_frameworks.slice(0, 3).join(', ')}</div>}
+          {c.compliance_unconfirmed?.length > 0 && <div className="text-[11px] text-amber-700 font-semibold mt-1 max-w-36">claims {c.compliance_unconfirmed.slice(0, 2).join(', ')} (unconfirmed)</div>}</>}</td>
         <td>{c.priority && <Badge v={c.priority} />}</td>
         <td className="text-slate-600 max-w-72 text-xs">{c.stop_reason}</td></tr>)}</tbody></table>
     {list?.length === 0 && <p className="text-sm text-slate-500">No companies yet. Run discovery or add domains on Overview.</p>}
@@ -288,8 +292,9 @@ function Review() {
           <div className="text-slate-600">Hunter confidence {d.contact.confidence}; email {d.contact.verification}</div>
           <div className="text-slate-500 text-xs mt-1">{d.contact.reasoning}</div></div>
         {d.score_detail.compliance && <div className="rounded-xl bg-[#f7f1e8] p-3"><h3 className="font-bold text-[#8f6a33] mb-1">Compliance status</h3>
-          <Badge v={d.score_detail.compliance.status === 'certified' ? 'compliant' : d.score_detail.compliance.status === 'in_progress' ? 'seeking' : 'unknown'} />
-          <span className="ml-2 text-xs text-slate-600">{d.score_detail.compliance.status === 'unknown' ? 'not verified either way' : d.score_detail.compliance.reason}</span></div>}
+          <Badge v={complianceBadge(d.score_detail.compliance.status)} />
+          <span className="ml-2 text-xs text-slate-600">{d.score_detail.compliance.status === 'unknown' ? 'could not be checked' : d.score_detail.compliance.reason}</span>
+          {d.score_detail.compliance.unconfirmed_certified?.length > 0 && <div className="mt-2 text-xs font-semibold text-amber-800 bg-amber-100 rounded-lg px-2.5 py-1.5">Check before sending: their own pages appear to claim {d.score_detail.compliance.unconfirmed_certified.join(', ')}, but we could not confirm it (script-rendered trust page).</div>}</div>}
         <div><h3 className="font-bold text-emerald-700 mb-1">ICP reasoning</h3><HBars rows={Object.entries(d.score_detail.detail || {}).filter(([, v]) => v.max > 0).map(([k, v]) => ({
           label: k.replaceAll('_', ' '), right: `${v.points}/${v.max}`, pct: (v.points / v.max) * 100, color: STATE_COLOR[v.state] }))} /></div>
         <div><h3 className="font-bold text-fuchsia-700 mb-1">Buying signals</h3><div className="flex gap-1.5 flex-wrap">{d.intent.signals?.map((s, k) => <Badge key={k} v={s.type} />)}</div></div>

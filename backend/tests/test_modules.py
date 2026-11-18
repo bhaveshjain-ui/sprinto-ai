@@ -252,6 +252,7 @@ def test_research_attempt_limit(c, monkeypatch):
 
     monkeypatch.setattr(research.llm, "generate", fake_generate)
     monkeypatch.setattr(research, "hunter_enrich", lambda *a, **k: [])
+    monkeypatch.setattr(research, "compliance_scan_step", lambda *a, **k: {})
     monkeypatch.setattr(research.scrape, "fetch", lambda conn, u: None)
     co = c.execute("SELECT * FROM companies WHERE id=1").fetchone()
     research.run_company(c, CFG, co)
@@ -268,6 +269,7 @@ def test_research_stops_when_verified(c, monkeypatch):
 
     monkeypatch.setattr(research.llm, "generate", fake_generate)
     monkeypatch.setattr(research, "hunter_enrich", lambda *a, **k: [])
+    monkeypatch.setattr(research, "compliance_scan_step", lambda *a, **k: {})
     monkeypatch.setattr(research.scrape, "fetch", lambda conn, u: None)
     monkeypatch.setattr(research, "_verified", lambda conn, cid: set(research.CRITERIA))
     co = c.execute("SELECT * FROM companies WHERE id=1").fetchone()

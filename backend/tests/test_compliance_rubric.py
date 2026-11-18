@@ -127,3 +127,25 @@ def test_only_real_compliance_vendors_count_as_a_competitor():
     assert scoring.score_facts(ok + [F(9, "competitor", "Drata (SOC 2 automation)")], CFG)["classification"] == "rejected"
     noise = scoring.score_facts(ok + [F(9, "competitor", "ouwba")], CFG)  # not a compliance vendor: ignored
     assert noise["classification"] == "qualified" and "competitor" not in noise["detail"]
+
+
+# ---- unverified certification claims: visible, never silently trusted, never silently ignored ----
+def test_unverified_certified_claims_are_flagged_without_changing_the_verified_status():
+    facts = [A(1, "Hiring Head of Security to oversee SOC 2", "Hiring Head of Security"),
+             A(2, "SOC 2 Type II verified, ISO 27001 coming soon", "SOC 2 Type II verified", status="ASSERTED")]
+    res = compliance.classify(facts)
+    assert res["status"] == "in_progress" and "SOC 2" in res["unconfirmed_certified"]
+
+
+def test_no_flag_when_nothing_unverified_or_already_certified():
+    assert compliance.classify([A(1, "SOC 2 Type II certified", "certified")])["unconfirmed_certified"] == []
+    assert compliance.classify([A(1, "SOC 2 Type II certified", "certified", status="ASSERTED"),
+                                A(2, "SOC 2 certified", "SOC 2 certified")])["unconfirmed_certified"] == []
+    assert compliance.classify([A(1, "Compliance Manager", "Compliance Manager. View role", status="ASSERTED")])["unconfirmed_certified"] == []
+
+
+def test_unconfirmed_claims_cap_priority_at_medium_with_a_reason():
+    p, why = intent.decide_priority(4, "qualified", "in_progress", CFG, ["SOC 2"])
+    assert p == "Medium" and "unconfirmed" in why and "SOC 2" in why
+    assert intent.decide_priority(4, "qualified", "in_progress", CFG, [])[0] == "High"
+    assert intent.decide_priority(1, "qualified", "in_progress", CFG, ["SOC 2"])[0] == "Low"  # a cap, never a promotion
