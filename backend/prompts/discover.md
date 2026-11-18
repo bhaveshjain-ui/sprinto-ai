@@ -7,6 +7,7 @@ Use Google Search to find up to {{count}} SaaS companies at Series A, B or C tha
 {{focus}}
 
 Today is {{today}}. Only include companies with evidence from the last 12 months.
+Prefer companies that do NOT yet hold SOC 2 / ISO 27001 (or are preparing / hiring for it). Skip companies that have already announced completing those certifications: they are low priority.
 Do not include companies already named here: {{exclude}}
 
 Return ONLY a JSON array. Each item:

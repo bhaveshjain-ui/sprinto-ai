@@ -218,9 +218,12 @@ def process_one(cid: int, force: bool = True):
 def companies():
     out = rows(conn(), "SELECT id, domain, name, origin, status, stage, stop_reason, score, classification, priority,"
                        " researched_at, score_detail FROM companies ORDER BY COALESCE(score,-1) DESC, id")
-    for r in out:  # which criteria are still unverified: tells you what "further investigation" actually needs
-        detail = json.loads(r.pop("score_detail") or "{}").get("detail", {})
-        r["missing"] = [k for k, v in detail.items() if v.get("state") in ("unverified", "conflict")]
+    for r in out:  # which criteria are still unverified (what "further investigation" needs) and the compliance status
+        sd = json.loads(r.pop("score_detail") or "{}")
+        r["missing"] = [k for k, v in sd.get("detail", {}).items() if v.get("state") in ("unverified", "conflict")]
+        comp = sd.get("compliance") or {}
+        r["compliance"] = comp.get("status")
+        r["compliance_frameworks"] = comp.get("frameworks") or []
     return out
 
 

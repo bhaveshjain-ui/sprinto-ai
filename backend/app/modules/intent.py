@@ -35,14 +35,34 @@ def validate(res, valid_ids: set[int], cfg) -> tuple[list, list, list[str]]:
     return signals, pains[:2], errs
 
 
+def decide_priority(n_signals: int, classification: str | None, comp_status: str | None, cfg: dict) -> tuple[str, str]:
+    """Priority rubric. Already compliant -> Low. High needs a qualified score AND a company that still needs
+    compliance; actively seeking compliance promotes a qualified Medium to High; a non-qualified company is capped at Medium."""
+    ic = cfg["intent"]
+    if comp_status == "certified":
+        return "Low", "already compliant: Sprinto sells to companies that still need compliance"
+    base = "High" if n_signals >= ic["high_min_signals"] else "Medium" if n_signals >= ic["medium_min_signals"] else "Low"
+    if base == "High" and classification != "qualified":
+        return "Medium", f"{n_signals} signals, but High needs a qualified score"
+    if base == "Medium" and classification == "qualified" and comp_status == "in_progress":
+        return "High", "qualified and actively seeking compliance"
+    return base, f"{n_signals} verified buying signals"
+
+
 def run_company(conn, cfg, company) -> dict:
+    comp = (json.loads(company["score_detail"] or "{}").get("compliance") or {})
+    if comp.get("status") == "certified":  # no point spending an AI call on a company that is not a target
+        why = f"already compliant ({', '.join(comp.get('frameworks') or []) or 'certified'})"
+        intent = {"signals": [], "pain_points": [], "priority": "Low", "errors": [], "reason": why}
+        conn.execute("UPDATE companies SET intent=?, priority='Low' WHERE id=?", (json.dumps(intent), company["id"]))
+        db.stop(conn, company["id"], "intent", f"priority Low: {why}")
+        return intent
     facts = verified_facts(conn, company["id"])
     res, _ = llm.generate(conn, cfg, "intent", grounded=False, name=company["name"], facts=facts_block(facts))
     signals, pains, errs = validate(res, {f["id"] for f in facts}, cfg)
     n = len(signals)
-    ic = cfg["intent"]
-    priority = "High" if n >= ic["high_min_signals"] else "Medium" if n >= ic["medium_min_signals"] else "Low"
-    intent = {"signals": signals, "pain_points": pains, "priority": priority, "errors": errs}
+    priority, why = decide_priority(n, company["classification"], comp.get("status"), cfg)
+    intent = {"signals": signals, "pain_points": pains, "priority": priority, "errors": errs, "reason": why}
     conn.execute("UPDATE companies SET intent=?, priority=? WHERE id=?", (json.dumps(intent), priority, company["id"]))
     if priority == "Low" or errs:
         db.stop(conn, company["id"], "intent", f"priority {priority}" + (f"; {'; '.join(errs)}" if errs else ""))

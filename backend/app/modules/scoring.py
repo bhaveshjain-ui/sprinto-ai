@@ -5,6 +5,7 @@ import json
 import re
 
 from app import db
+from app.modules import compliance
 
 
 def _num(value: str) -> int | None:
@@ -63,9 +64,23 @@ def score_facts(facts: list[dict], cfg: dict) -> dict:
     sc = cfg["scoring"]
     detail, total, potential = {}, 0.0, 0.0
     hard_stop = None
+    # Sprinto sells to companies that still NEED compliance, so audit signals are scored as "need", not "has it".
+    comp_status = compliance.classify([f for f in facts if f["criterion"] == "audit_signals"])
     for crit, weight in sc["weights"].items():
         mine = [f for f in facts if f["criterion"] == crit]
         ver = [f for f in mine if f["status"] == "VERIFIED"]
+        if crit == "audit_signals" and comp_status["status"] != "unknown":
+            st = comp_status["status"]
+            if st == "certified":  # verified negative: nothing to sell them
+                detail[crit] = {"state": "negative", "points": 0, "max": weight, "evidence": comp_status["evidence"],
+                                "explanation": f"ALREADY COMPLIANT: {comp_status['reason']}. Not a target (low priority)."}
+            else:
+                full = comp_status.get("strong") or len(comp_status["evidence"]) >= 2
+                pts = float(weight) if full else round(weight * 0.6, 1)
+                detail[crit] = {"state": "positive", "points": pts, "max": weight, "evidence": comp_status["evidence"],
+                                "explanation": f"needs compliance: {comp_status['reason']}"}
+                total += pts
+            continue
         if any(f["conflict"] for f in ver):
             detail[crit] = {"state": "conflict", "points": 0, "max": weight, "evidence": [f["id"] for f in ver],
                             "explanation": "verified sources disagree; earns nothing until resolved"}
@@ -89,7 +104,9 @@ def score_facts(facts: list[dict], cfg: dict) -> dict:
                 total += pts
                 if frac == 0:
                     potential += weight
-    comp = [f for f in facts if f["criterion"] == "competitor" and f["status"] == "VERIFIED"]
+    vendors = [v.lower() for v in sc.get("competitors", [])]
+    comp = [f for f in facts if f["criterion"] == "competitor" and f["status"] == "VERIFIED"
+            and any(v in (f["value"] or "").lower() for v in vendors)]  # an unrecognised "competitor" is noise, not a negative
     if comp:
         hard_stop = f"already uses a competitor: {comp[0]['value']}"
         detail["competitor"] = {"state": "negative", "points": 0, "max": 0, "evidence": [comp[0]["id"]],
@@ -108,7 +125,7 @@ def score_facts(facts: list[dict], cfg: dict) -> dict:
     else:
         cls, reason = "rejected", f"score {total}; even full unverified points could not reach {sc['investigate_min']}"
     return {"score": total, "classification": cls, "reason": reason, "detail": detail,
-            "unverified_points": round(potential, 1)}
+            "unverified_points": round(potential, 1), "compliance": comp_status}
 
 
 def run_company(conn, cfg, company_id: int) -> dict:

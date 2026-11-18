@@ -48,6 +48,9 @@ scoring:
   proceed_min: 55          # companies at/above this (qualified or further investigation) continue to contact + draft
   employee_full: [20, 500]
   employee_half: [[10, 19], [501, 1000]]
+  # Only these count as "already uses a compliance-automation tool" (a verified hit means not a target).
+  competitors: [vanta, drata, secureframe, thoropass, oneleet, scrut, laika, tugboat, hyperproof, "strike graph", anecdotes,
+                cypress, trustero, apptega, "comp ai", delve, sprinto, "sprinto.com"]
   enterprise_keywords: ["enterprise", "fortune", "global 2000", "large customers"]
   relevant_industries: ["fintech", "health", "security", "data", "ai", "devops", "developer", "hr", "payments", "insurance", "legal", "analytics", "saas", "software", "cloud", "infrastructure"]
 

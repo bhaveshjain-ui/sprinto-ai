@@ -8,7 +8,7 @@ Find facts for these criteria, only those you can support with a source:
 Criterion definitions:
 - funding_stage: latest funding round, e.g. "Series B, $30M, March 2026".
 - saas: "yes" or "no" - does the company sell subscription software?
-- audit_signals: security/compliance job posts (GRC, security engineer, compliance manager), a trust page showing SOC 2 / ISO 27001 status (in progress, Type I, etc.).
+- audit_signals: the company's compliance STATUS. Begin the value with exactly one tag: "CERTIFIED: " if they already hold a certification or attestation (SOC 2, ISO 27001, HIPAA...), "IN PROGRESS: " if they are preparing for one (trust page says in progress, readiness work, planned first audit), or "HIRING: " for security/compliance/GRC job posts. Always report certification evidence if it exists: already-certified companies are NOT targets, so this matters as much as finding a need.
 - employee_count: a number of employees.
 - customers: customer count and/or named enterprise customers.
 - industry: short phrase.

@@ -16,4 +16,5 @@ Return ONLY JSON:
  "enterprise_expansion_signals": ["..."],
  "search_queries": ["3-5 concrete news-search phrasings for finding matching companies"]}
 
+Important: Sprinto's best prospects do NOT yet hold SOC 2 / ISO 27001 and are preparing for it or under pressure to get it. Companies that are already certified are low priority. Say so in the summary.
 Be specific and base it on what you find. Do not invent statistics.
